@@ -100,9 +100,9 @@ License texts are taken directly from the repository and locked dependency sourc
 artwork is drawn in code using the existing original WordCraft icon. No Office artwork is used.
 
 Use `-Arch arm64` with the Rust ARM64 MSVC target and corresponding Microsoft ARM64 build tools.
-Set `$env:WORDCRAFT_VERSION` to give an installer a fork/revision version (for example
-`0.7.0-fork.2`); this changes the setup version and filename, while the packaged application
-retains its Cargo version.
+Release versions come from `[workspace.package].version` in `Cargo.toml`. Increase that
+version for each release so the application, setup wizard and installer filename agree.
+For example, version `0.7.1` produces `wordcraft-0.7.1-windows-x64-setup.exe`.
 
 `-SkipBuild` packages already-built release binaries from the normal Cargo target directory;
 those binaries must have been built with `RUSTFLAGS='-C target-feature=+crt-static'`.
@@ -118,7 +118,7 @@ keys are build-time inputs and never installed with WordCraft.
 ## Verify a build
 
 ```powershell
-pwsh -File packaging/windows/test-exe.ps1 -Installer .\dist\release\wordcraft-0.7.0-windows-x64-setup.exe
+pwsh -File packaging/windows/test-exe.ps1 -Installer .\dist\release\wordcraft-0.7.1-windows-x64-setup.exe
 ```
 
 Add `-TestDirectory D:\InstallerTests` to verify installation on another writable drive.
@@ -138,7 +138,7 @@ For interactive review, launch setup normally and inspect each page. A silent de
 also available:
 
 ```powershell
-.\wordcraft-0.7.0-windows-x64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="D:\Apps\WordCraft ChatGPT"
+.\wordcraft-0.7.1-windows-x64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="D:\Apps\WordCraft ChatGPT"
 ```
 
 Silent setup never launches WordCraft automatically. Normal interactive setup offers launch on
