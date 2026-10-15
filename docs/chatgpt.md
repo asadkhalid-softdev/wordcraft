@@ -236,14 +236,14 @@ active document and turn, and cannot silently discard unsaved work.
 
 ### Response time limits
 
-The current desktop blocking HTTP client has **90-second waits for response headers and
+The current desktop blocking HTTP client has **180-second waits for response headers and
 individual network reads**, and a 15-second connection timeout. Streaming reads get a fresh
-wait, so a continuously streaming reply can run longer than 90 seconds. A stalled stream can
-time out while waiting for its next data. This is not a total 90-second cap on a reply or
+wait, so a continuously streaming reply can run longer than 180 seconds. A stalled stream can
+time out while waiting for its next data. This is not a total 180-second cap on a reply or
 multi-step conversation turn.
 
 The UI also has a **five-minute inactivity watchdog** during a reply. Matching response/tool
-notifications refresh it. Ordinary pending protocol requests time out after 90 seconds; sign-in
+notifications refresh it. Ordinary pending protocol requests time out after 180 seconds; sign-in
 requests have ten minutes, while the browser callback listener has five minutes. These are
 current code limits, with no timeout setting in the ChatGPT settings popup.
 
@@ -309,6 +309,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-16 | Increase HTTP response/read and ordinary protocol waits from 90 to 180 seconds |
 | 2026-10-16 | Align reference jumps at the range beginning near the viewport top; explain HTTP and inactivity timeouts |
 | 2026-10-16 | Verified document-citation tool, local Markdown link navigation and persisted destinations |
 | 2026-10-15 | Private per-document chat archives, restored drafts/references and bounded continuation context |

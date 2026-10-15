@@ -146,7 +146,7 @@ pub(super) fn http() -> Result<Client, String> {
         .https_only(true)
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(90))
+        .timeout(Duration::from_secs(180))
         .user_agent("WordCraft/0.7 ChatGPT")
         .build()
         .map_err(|_| "Could not initialize the HTTPS connection".into())

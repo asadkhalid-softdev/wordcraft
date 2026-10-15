@@ -710,7 +710,7 @@ pub fn poll(app: &mut WordApp, ctx: &egui::Context) {
     }
     let now = ctx.input(|i| i.time);
     if app.chatgpt.active_at.is_some_and(|at| now - at > 300.0)
-        || app.chatgpt.pending.values().any(|p| now - p.at > if matches!(p.request, Request::Login) { 600.0 } else { 90.0 })
+        || app.chatgpt.pending.values().any(|p| now - p.at > if matches!(p.request, Request::Login) { 600.0 } else { 180.0 })
     {
         app.chatgpt.fail("ChatGPT took too long to respond. Reconnect and try again.".into());
     }
