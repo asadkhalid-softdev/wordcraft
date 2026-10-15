@@ -1,6 +1,6 @@
 # ChatGPT document assistant
 
-Last updated: 2026-10-15 · M0 fix: keep streaming chat visible through wide replies and Focus mode.
+Last updated: 2026-10-15 · M0 feature: private per-document chat history and resumption.
 
 ## Sign in from WordCraft
 
@@ -114,8 +114,7 @@ Click the link to select and reveal the source range. Hover the reference to rev
 focus its remove control with the keyboard, to remove it before sending. Removing a reference
 changes only the draft. Sent messages retain clickable references in chat history.
 
-You can attach up to eight selections, totaling at most 32,000 bytes. Attachments are in memory
-only, belong to the current document, and clear with the conversation. Sign-in preserves a draft's
+You can attach up to eight selections, totaling at most 32,000 bytes. Attachments are saved with the document’s local chat and clear with the conversation. Sign-in preserves a draft's
 attachments. After edits, navigation relocates an unchanged excerpt using nearby text; changed,
 ambiguous or excessively large searches ask you to select it again instead of guessing a range.
 A missing or changed reference also prevents sending that draft until it is removed or replaced.
@@ -175,13 +174,34 @@ preferences and document files.
 
 The sidebar remains available in Focus mode, including when a document command changes the view during a reply. Wide Markdown tables and code scroll horizontally inside the history area, keeping the header and composer within the window. The assistant is instructed to change view modes, panes and zoom only when requested.
 
-One conversation belongs to the loaded document. Collapsing the sidebar keeps it; **⋯ → Clear
-conversation**, replacing the document, switching accounts/models or restarting the application
-starts a new one. History is currently in memory only. Failed turns preserve working context and mark interrupted tool outcomes as uncertain, so the assistant must inspect before retrying an edit.
-**Clear conversation** and **Sign out** cancel pending document actions immediately. Clearing keeps
-your saved login and reconnects automatically; signing out removes the saved credentials.
-An in-flight HTTPS request may finish in the background, but cannot dispatch more document actions.
-Earlier edits remain and can be reversed with normal Undo. Ctrl+Enter (Cmd+Enter on macOS) sends;
+Each saved document has its own local conversation. Reopening the same file restores its messages,
+unsent draft, selected-text references and bounded continuation context. Send a new message to resume;
+loading history never starts an inference request or repeats earlier document actions. Failed turns
+mark interrupted tool outcomes as uncertain, so the assistant must inspect before retrying an edit.
+Collapsing the sidebar, restarting WordCraft, signing in or changing models keeps the conversation.
+
+Chats are stored separately from document files under the private WordCraft settings folder:
+`%APPDATA%\WordCraft\chatgpt-history` on Windows, or `chatgpt-history` under the settings root
+listed above on other platforms. Hashed filenames identify the document’s absolute path. Chat files
+contain document excerpts, messages and continuation notes, so treat them as private writing.
+They contain no login credentials and are excluded from this repository and installers.
+Writes use protected temporary files and atomic replacement; conflicting writes from another
+window produce an error instead of silently overwriting history.
+
+Messages and drafts save automatically, including when switching documents or closing the app.
+An untitled document keeps its chat in memory until you save the document. **Save As** carries the
+current conversation to the new path and retains the old file’s chat. Moving or renaming a document
+outside WordCraft gives it a new chat identity; history does not travel inside DOCX files.
+The sidebar initially renders the latest 256 messages; **Load earlier messages** reveals older ones.
+An archive supports up to 8,192 messages and 32 MiB; limits or storage failures are shown explicitly,
+with existing saved history retained. The model receives bounded continuation notes and recent
+messages rather than the entire archive, and rereads live document content before continuing edits.
+
+**⋯ → Clear conversation** deletes this document’s saved chat, draft and continuation context,
+keeps your saved login and reconnects automatically. **Sign out** removes saved credentials and
+keeps local chat history. Both cancel pending document actions immediately. An in-flight HTTPS
+request may finish in the background, but cannot dispatch more document actions. Earlier edits
+remain and can be reversed with normal Undo. Ctrl+Enter (Cmd+Enter on macOS) sends;
 ordinary Enter adds a newline.
 
 The assistant uses `wordcraft_read_file` for explicitly referenced files, `wordcraft_commands` to discover every registered engine command and native
@@ -244,7 +264,7 @@ are compiled only for native desktop.
 
 Offline tests cover PKCE, loopback callback validation, nonce and signed ID-token checks, cancellation, signed access-token validation, private atomic credential replacement, malformed
 imports, bounded SSE parsing, completed-response gating, document command discovery/editing/Undo,
-stale and cancelled tool calls, settings/credential isolation, large Unicode paragraph pagination, search across chunk boundaries, table/part paths, oversized nested results, escaped request budgeting and completed-edit receipts. Headless screenshots inspect the
+stale and cancelled tool calls, settings/credential isolation, large Unicode paragraph pagination, search across chunk boundaries, table/part paths, oversized nested results, escaped request budgeting and completed-edit receipts. Private-history tests cover restart/resumption, document separation, Save As, drafts, references, queued clearing, malformed archives and conflicting windows. Headless screenshots inspect the
 sidebar and settings popup. Live sign-in, account model discovery and a real inference turn still
 require an interactive account check. No real credential JSON is used in tests or committed.
 
@@ -252,6 +272,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-15 | Private per-document chat archives, restored drafts/references and bounded continuation context |
 | 2026-10-15 | Keep ChatGPT outside Focus-mode pane suppression and contain wide streamed Markdown inside the history viewport |
 | 2026-10-15 | Bounded overview, literal search and paged document reads; automatic working-memory checkpoints and context-limit recovery |
 | 2026-10-15 | Default-on web search with persisted switch and source citations, user-referenced file reader, and right-click Add to Chat |

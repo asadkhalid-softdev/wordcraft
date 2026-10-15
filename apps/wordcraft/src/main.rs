@@ -200,6 +200,9 @@ fn saved_window() -> Option<WindowGeometry> {
 }
 
 fn save_prefs(app: &WordApp) {
+    if let Err(error) = wordcraft_ui_egui::chatgpt::flush_history(app) {
+        log::warn!("chat history: {error}");
+    }
     if !prefs_enabled() {
         return;
     }

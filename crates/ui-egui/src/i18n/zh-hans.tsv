@@ -2246,3 +2246,5 @@
 	Narrow	窄
 	Medium	中等
 	Read Document Context	读取文档上下文
+	Load earlier messages	加载更早的消息
+	Save the document to keep its chat after restarting WordCraft.	保存文档，以便在重启 WordCraft 后保留聊天记录。

@@ -28,6 +28,8 @@ README continues below; an unchanged copy is also kept in [README_original.md](R
 
 - **ChatGPT sidebar:** a collapsible right pane with one conversation, streamed replies,
   account settings and a model picker showing models available to your account.
+- **Saved conversations:** each document restores its local chat, draft and references when reopened.
+  Clear conversation deletes its saved history; signing out keeps it.
 - **Large-document support:** ChatGPT searches and reads relevant ranges instead of loading the
   whole document. Working context is reduced automatically as the conversation grows.
 - **Document editing:** ChatGPT can inspect and edit the loaded document through WordCraft's

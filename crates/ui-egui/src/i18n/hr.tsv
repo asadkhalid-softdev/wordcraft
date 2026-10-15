@@ -2703,3 +2703,5 @@ preview	Title	Naslov
 
 	Allow ChatGPT to search the web when useful. Changes apply to the next message.	Allow ChatGPT to search the web when useful. Changes apply to the next message.
 	Read Document Context	Pročitaj kontekst dokumenta
+	Load earlier messages	Učitaj starije poruke
+	Save the document to keep its chat after restarting WordCraft.	Spremite dokument kako biste zadržali razgovor nakon ponovnog pokretanja WordCrafta.

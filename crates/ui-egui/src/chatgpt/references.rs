@@ -8,7 +8,7 @@ use super::MAX_PROMPT;
 pub(super) const MAX_REFERENCES: usize = 8;
 const MAX_SEARCH: usize = 2_000_000;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(super) struct Reference {
     pub id: u64,
     pub document: u64,
@@ -34,6 +34,23 @@ impl Reference {
         let before = first.get(..a.off).ok_or("Invalid selection boundary")?.chars().rev().take(24).collect::<Vec<_>>().into_iter().rev().collect();
         let after = last.get(b.off..).ok_or("Invalid selection boundary")?.chars().take(24).collect();
         Ok(Self { id, document: session.document_id(), selection: session.sel.clone(), text, revision: session.rev(), before, after })
+    }
+
+    pub(super) fn validate_saved(&self) -> Result<(), String> {
+        if self.text.len() > MAX_PROMPT
+            || self.before.len() > 128
+            || self.after.len() > 128
+            || self.selection.anchor.path.0.len() > 100
+            || self.selection.focus.path.0.len() > 100
+        {
+            return Err("Saved chat contains an invalid text reference".into());
+        }
+        Ok(())
+    }
+    pub(super) fn restore_document(&mut self, document: u64) {
+        self.document = document;
+        // Session revision numbers restart. Always relocate and verify persisted references.
+        self.revision = u64::MAX;
     }
 
     pub fn label(&self) -> String {

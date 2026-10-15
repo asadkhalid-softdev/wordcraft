@@ -2701,3 +2701,5 @@ preview	Title	Пример
 
 	Allow ChatGPT to search the web when useful. Changes apply to the next message.	Allow ChatGPT to search the web when useful. Changes apply to the next message.
 	Read Document Context	Прочитать контекст документа
+	Load earlier messages	Загрузить предыдущие сообщения
+	Save the document to keep its chat after restarting WordCraft.	Сохраните документ, чтобы сохранить чат после перезапуска WordCraft.

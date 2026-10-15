@@ -2246,3 +2246,5 @@
 	Narrow	Estreita
 	Medium	Média
 	Read Document Context	Ler o contexto do documento
+	Load earlier messages	Carregar mensagens anteriores
+	Save the document to keep its chat after restarting WordCraft.	Salve o documento para manter a conversa após reiniciar o WordCraft.

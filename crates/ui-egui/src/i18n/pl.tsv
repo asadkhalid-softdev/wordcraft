@@ -2693,3 +2693,5 @@ preview	Title	Tytuł
 
 	Allow ChatGPT to search the web when useful. Changes apply to the next message.	Allow ChatGPT to search the web when useful. Changes apply to the next message.
 	Read Document Context	Odczytaj kontekst dokumentu
+	Load earlier messages	Wczytaj wcześniejsze wiadomości
+	Save the document to keep its chat after restarting WordCraft.	Zapisz dokument, aby zachować rozmowę po ponownym uruchomieniu WordCraft.

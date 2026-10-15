@@ -2699,3 +2699,5 @@
 
 	Allow ChatGPT to search the web when useful. Changes apply to the next message.	Allow ChatGPT to search the web when useful. Changes apply to the next message.
 	Read Document Context	Dokumentumkörnyezet olvasása
+	Load earlier messages	Korábbi üzenetek betöltése
+	Save the document to keep its chat after restarting WordCraft.	Mentse a dokumentumot, hogy a beszélgetés a WordCraft újraindítása után is megmaradjon.

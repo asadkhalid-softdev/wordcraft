@@ -2234,3 +2234,5 @@
 	Narrow	狭い
 	Medium	中
 	Read Document Context	文書のコンテキストを読み取る
+	Load earlier messages	以前のメッセージを読み込む
+	Save the document to keep its chat after restarting WordCraft.	WordCraft の再起動後もチャットを保持するには、文書を保存してください。

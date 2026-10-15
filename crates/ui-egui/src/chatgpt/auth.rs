@@ -223,13 +223,13 @@ fn save(path: &Path, credentials: &impl Serialize) -> Result<(), String> {
 }
 
 #[cfg(unix)]
-fn protect(path: &Path) -> Result<(), String> {
+pub(super) fn protect(path: &Path) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|_| "Could not protect ChatGPT credentials".into())
 }
 
 #[cfg(windows)]
-fn protect(path: &Path) -> Result<(), String> {
+pub(super) fn protect(path: &Path) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
     let output = Command::new("whoami.exe")
@@ -255,7 +255,7 @@ fn protect(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(any(unix, windows)))]
-fn protect(_path: &Path) -> Result<(), String> {
+pub(super) fn protect(_path: &Path) -> Result<(), String> {
     Err("Protected credential storage is unavailable on this platform".into())
 }
 

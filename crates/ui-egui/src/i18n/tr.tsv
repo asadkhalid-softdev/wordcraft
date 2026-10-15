@@ -2700,3 +2700,5 @@ preview	Title	Örnek
 
 	Allow ChatGPT to search the web when useful. Changes apply to the next message.	Allow ChatGPT to search the web when useful. Changes apply to the next message.
 	Read Document Context	Belge bağlamını oku
+	Load earlier messages	Önceki mesajları yükle
+	Save the document to keep its chat after restarting WordCraft.	WordCraft yeniden başlatıldıktan sonra sohbeti korumak için belgeyi kaydedin.

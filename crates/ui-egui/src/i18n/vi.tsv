@@ -2743,3 +2743,5 @@ template	Letter	Thư
 
 	Allow ChatGPT to search the web when useful. Changes apply to the next message.	Allow ChatGPT to search the web when useful. Changes apply to the next message.
 	Read Document Context	Đọc ngữ cảnh tài liệu
+	Load earlier messages	Tải tin nhắn trước đó
+	Save the document to keep its chat after restarting WordCraft.	Lưu tài liệu để giữ cuộc trò chuyện sau khi khởi động lại WordCraft.

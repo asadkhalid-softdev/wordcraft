@@ -154,7 +154,11 @@ impl Worker {
             }
             "account/logout" => auth::logout(&http),
             "thread/start" => {
-                self.history.clear();
+                let resume = p.get("resume").and_then(Value::as_array).cloned().unwrap_or_default();
+                if !super::history::valid_memory(&resume) {
+                    return Err("Saved conversation context exceeds its limits".into());
+                }
+                self.history = resume;
                 self.tools = inference::tools(p.get("dynamicTools").unwrap_or(&json!([])))?;
                 Ok(json!({"thread": {"id": "document-chat"}}))
             }
@@ -176,6 +180,12 @@ impl Worker {
             }
             _ => Err("Unsupported ChatGPT operation".into()),
         }
+    }
+    fn snapshot(&self) -> Result<(), String> {
+        let checkpoint = context::Checkpoint::capture(&self.history);
+        let notes = checkpoint.notes.clone();
+        let memory = checkpoint.restore(&notes);
+        self.notice("context/snapshot", json!({"threadId":"document-chat","memory":memory}))
     }
     fn prepare_context(&mut self, http: &reqwest::blocking::Client, token: &str, force: bool) -> Result<(), String> {
         if !force && inference::input_size(&self.model, &self.history, &self.tools, self.web_search)? <= context::TRIGGER {
@@ -222,6 +232,7 @@ impl Worker {
             }
             let token = auth::access(http)?.ok_or("Import ChatGPT credentials in ChatGPT settings first")?;
             self.prepare_context(http, &token, false)?;
+            self.snapshot()?;
             let mut retried_context = false;
             let output = loop {
                 let result = inference::response(
@@ -271,6 +282,7 @@ impl Worker {
             let function_calls: Vec<_> =
                 output.iter().filter(|item| item.get("type").and_then(Value::as_str) == Some("function_call")).cloned().collect();
             self.history.extend(output);
+            self.snapshot()?;
             if function_calls.is_empty() {
                 return Ok(());
             }
@@ -308,6 +320,7 @@ impl Worker {
                     self.notice("item/file/completed", json!({"threadId": "document-chat", "success": result.get("success")}))?;
                 }
                 self.history.push(json!({"type": "function_call_output", "call_id": call_id, "output": result.to_string()}));
+                self.snapshot()?;
             }
         }
         Err("This reply reached its action-round limit. Review the document before continuing.".into())

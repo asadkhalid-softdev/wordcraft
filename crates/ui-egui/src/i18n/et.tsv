@@ -2268,3 +2268,5 @@
 	Narrow	Kitsas
 	Medium	Keskmine
 	Read Document Context	Loe dokumendi konteksti
+	Load earlier messages	Laadi varasemad sõnumid
+	Save the document to keep its chat after restarting WordCraft.	Salvestage dokument, et vestlus säiliks pärast WordCrafti taaskäivitamist.
