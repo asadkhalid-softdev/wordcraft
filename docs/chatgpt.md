@@ -1,6 +1,6 @@
 # ChatGPT document assistant
 
-Last updated: 2026-10-15 · M0 extension: standalone browser sign-in and automatic credential import.
+Last updated: 2026-10-15 · M0 extension: bounded document retrieval and automatic working memory.
 
 ## Sign in from WordCraft
 
@@ -175,7 +175,7 @@ preferences and document files.
 
 One conversation belongs to the loaded document. Collapsing the sidebar keeps it; **⋯ → Clear
 conversation**, replacing the document, switching accounts/models or restarting the application
-starts a new one. History is currently in memory only. Failed turns discard the backend context.
+starts a new one. History is currently in memory only. Failed turns preserve working context and mark interrupted tool outcomes as uncertain, so the assistant must inspect before retrying an edit.
 **Clear conversation** and **Sign out** cancel pending document actions immediately. Clearing keeps
 your saved login and reconnects automatically; signing out removes the saved credentials.
 An in-flight HTTPS request may finish in the background, but cannot dispatch more document actions.
@@ -183,10 +183,44 @@ Earlier edits remain and can be reversed with normal Undo. Ctrl+Enter (Cmd+Enter
 ordinary Enter adds a newline.
 
 The assistant uses `wordcraft_read_file` for explicitly referenced files, `wordcraft_commands` to discover every registered engine command and native
-printing command, `wordcraft_inspect` to inspect paginated document state, and `wordcraft_execute`
+printing command, `wordcraft_document` for bounded overview/search/read operations, `wordcraft_inspect` for a bounded overview, and `wordcraft_execute`
 to dispatch edits through WordCraft's normal command validation and Undo. Unsupported UI dialogs,
 shell execution and arbitrary external tools are excluded. Tool calls must still belong to the
 active document and turn, and cannot silently discard unsaved work.
+
+### Large documents and long conversations
+
+WordCraft does not send the whole loaded document with your question. The assistant starts with
+a small overview: title, block count, headings, selection positions, revision and available document
+parts. It can search literal, case-sensitive phrases and read relevant paragraphs in small pages,
+including paragraphs inside nested table cells. It can search related terms separately. Headers,
+footers, notes, comments and text boxes are available as separate stories. Selecting text and using
+**Add to Chat** remains the most direct way to identify a passage.
+
+For a whole-document review, the assistant follows continuation cursors through the body and each
+part. A result page is explicitly partial; it must not claim to have reviewed unread text. Long
+individual paragraphs are split at UTF-8 boundaries, and search windows overlap so phrases crossing
+a boundary are found. Cursors include paragraph ordinals and byte offsets; pass the returned
+revision to detect changes before continuing a scan. Known selection/search paths can be read
+directly. Formatting details remain available through `document.paragraph` and other commands.
+The legacy `document.inspect` route is replaced with a bounded overview inside ChatGPT; other
+clients retain its original behavior.
+
+Before every model request, WordCraft checks the complete serialized payload, including tool
+schemas and JSON escaping. At 144 KB, it reduces older working context to a bounded summary and
+keeps the current question plus current-turn tool receipts. The sidebar transcript is independent
+and is not cleared by this process (it retains the latest 256 messages). A brief **Updating
+conversation memory…** status appears. Summarization uses your selected ChatGPT model and may
+consume plan usage; if it fails, a bounded local checkpoint allows continuation. Summaries can omit
+details, so the assistant is instructed to reread the live document and sources when needed.
+
+Every tool result has a 24 KB serialization limit, including nested objects and results from generic
+commands. Oversized results preserve whether the operation succeeded and explicitly warn against
+repeating a successful edit. File reads are clamped to 4 KB per page with valid continuation offsets.
+A recognized provider context-limit rejection triggers one smaller-context inference retry; completed
+commands are never replayed by the transport. If a single user message/excerpt is itself too large,
+WordCraft asks for a smaller message while preserving the conversation. Existing per-reply action
+limits still apply; full-document tasks may need follow-up messages to continue their coverage.
 
 The direct backend calls the public `https://api.openai.com/v1/models` and `/responses` routes,
 with `store=false` and `stream=true`. Your questions and necessary document/tool context go to
@@ -208,7 +242,7 @@ are compiled only for native desktop.
 
 Offline tests cover PKCE, loopback callback validation, nonce and signed ID-token checks, cancellation, signed access-token validation, private atomic credential replacement, malformed
 imports, bounded SSE parsing, completed-response gating, document command discovery/editing/Undo,
-stale and cancelled tool calls, and settings/credential isolation. Headless screenshots inspect the
+stale and cancelled tool calls, settings/credential isolation, large Unicode paragraph pagination, search across chunk boundaries, table/part paths, oversized nested results, escaped request budgeting and completed-edit receipts. Headless screenshots inspect the
 sidebar and settings popup. Live sign-in, account model discovery and a real inference turn still
 require an interactive account check. No real credential JSON is used in tests or committed.
 
@@ -216,6 +250,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-15 | Bounded overview, literal search and paged document reads; automatic working-memory checkpoints and context-limit recovery |
 | 2026-10-15 | Default-on web search with persisted switch and source citations, user-referenced file reader, and right-click Add to Chat |
 | 2026-10-15 | Selection references in the mini toolbar/composer, document navigation and native Markdown/equation previews |
 | 2026-10-15 | Simplified chat controls to Clear conversation and Sign out; both cancel active replies |

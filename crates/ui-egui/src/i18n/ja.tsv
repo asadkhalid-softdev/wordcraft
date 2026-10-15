@@ -2233,3 +2233,4 @@
 # Reading Mode column widths (#1040)
 	Narrow	狭い
 	Medium	中
+	Read Document Context	文書のコンテキストを読み取る

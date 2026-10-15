@@ -7,6 +7,7 @@ pub mod chart;
 pub mod citations;
 pub mod column;
 pub mod connectors;
+pub mod context;
 pub mod controls;
 pub mod design;
 pub mod draw;
@@ -81,6 +82,7 @@ pub fn registry() -> Registry {
     v.extend(table_mouse::specs());
     v.extend(review::specs());
     v.extend(file::specs());
+    v.extend(context::specs());
     v.extend(options::specs());
     v.extend(design::specs());
     v.extend(references::specs());

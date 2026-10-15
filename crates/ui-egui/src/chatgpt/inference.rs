@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 const MAX_RESPONSE: usize = 2_000_000;
 const MAX_INPUT: usize = 256_000;
+pub(super) const CONTEXT_LIMIT: &str = "ChatGPT context limit reached";
 
 pub(super) fn tools(dynamic: &Value) -> Result<Value, String> {
     let items = dynamic.as_array().ok_or("Invalid document tools")?;
@@ -34,6 +35,10 @@ fn payload(model: &str, history: &[Value], tools: &Value, web_search: bool) -> R
         "store": false, "stream": true, "parallel_tool_calls": false, "include": ["reasoning.encrypted_content"]}))
 }
 
+pub(super) fn input_size(model: &str, history: &[Value], tools: &Value, web_search: bool) -> Result<usize, String> {
+    serde_json::to_vec(&payload(model, history, tools, web_search)?).map(|b| b.len()).map_err(|_| "Could not encode conversation".into())
+}
+
 pub(super) struct ToolOptions<'a> {
     pub definitions: &'a Value,
     pub web_search: bool,
@@ -51,7 +56,9 @@ pub(super) fn response(
     let payload = payload(model, history, options.definitions, options.web_search)?;
     let bytes = serde_json::to_vec(&payload).map_err(|_| "Could not encode the conversation")?;
     if bytes.len() > MAX_INPUT {
-        return Err("Conversation is too long. Clear the conversation to continue.".into());
+        return Err(
+            "This message exceeds the request budget. Send a shorter message or attach a smaller excerpt; the conversation is preserved.".into()
+        );
     }
     let result = http
         .post(format!("{}/responses", auth::API))
@@ -61,8 +68,23 @@ pub(super) fn response(
         .send()
         .map_err(|_| "Could not reach ChatGPT. Check the document before retrying; earlier actions may have completed.")?;
     if result.status().as_u16() != 200 {
-        let error = auth::status_error(result.status().as_u16());
-        return Err(if options.web_search && result.status().as_u16() == 400 {
+        let status = result.status().as_u16();
+        // Read only a bounded error body and expose a stable classification, never server text.
+        if status == 400 || status == 413 {
+            let mut bytes = Vec::new();
+            use std::io::Read;
+            let _ = result.take(8192).read_to_end(&mut bytes);
+            if let Ok(error) = serde_json::from_slice::<Value>(&bytes)
+                && matches!(
+                    error.pointer("/error/code").and_then(Value::as_str),
+                    Some("context_length_exceeded" | "context_window_exceeded" | "input_too_long")
+                )
+            {
+                return Err(CONTEXT_LIMIT.into());
+            }
+        }
+        let error = auth::status_error(status);
+        return Err(if options.web_search && status == 400 {
             format!("{error} Try disabling web search in ChatGPT settings or selecting another model.")
         } else {
             error
@@ -151,6 +173,7 @@ fn stream_error(event: &Value) -> String {
         .and_then(Value::as_str)
         .unwrap_or("");
     match code {
+        "context_length_exceeded" | "context_window_exceeded" | "input_too_long" => CONTEXT_LIMIT,
         "subscription_sharing_usage_limit_exceeded" | "rate_limit_exceeded" | "insufficient_quota" => {
             "ChatGPT usage limit reached. Review ChatGPT Settings → Usage."
         }
@@ -195,6 +218,11 @@ mod tests {
         stream(text.as_bytes(), &AtomicBool::new(false), |_| Ok(()))
     }
     #[test]
+    fn context_rejection_is_classified_without_exposing_provider_text() {
+        let event = json!({"type":"response.failed","response":{"error":{"code":"context_length_exceeded","message":"private echoed input"}}});
+        assert_eq!(parse(&[event]).unwrap_err(), CONTEXT_LIMIT);
+    }
+    #[test]
     fn completed_stream_required_before_document_actions() {
         let item = json!({"type": "function_call", "name": "wordcraft_execute", "call_id": "c", "arguments": "{}"});
         let provisional = json!({"type": "response.output_item.done", "output_index": 0, "item": item});
@@ -228,7 +256,7 @@ mod search_tests {
         let functions = tools(&super::super::tool_definitions()).unwrap();
         let enabled = payload("account-model", &[], &functions, true).unwrap();
         assert_eq!(enabled["tools"][0]["type"], "namespace");
-        assert_eq!(enabled["tools"][0]["tools"].as_array().unwrap().len(), 4);
+        assert_eq!(enabled["tools"][0]["tools"].as_array().unwrap().len(), 5);
         assert_eq!(enabled["tools"][1]["type"], "web_search");
         assert_eq!(enabled["store"], false);
         assert_eq!(enabled["stream"], true);

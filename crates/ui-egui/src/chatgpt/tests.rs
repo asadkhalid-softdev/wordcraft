@@ -207,7 +207,7 @@ fn protocol_round_trip_from_account_to_edit_and_clear() {
     let start = outgoing.try_recv().unwrap();
     assert_eq!(start["method"], "thread/start");
     assert_eq!(start["params"]["ephemeral"], true);
-    assert_eq!(start["params"]["dynamicTools"].as_array().unwrap().len(), 4);
+    assert_eq!(start["params"]["dynamicTools"].as_array().unwrap().len(), 5);
     receive(&mut app, &ctx, json!({"id": start["id"], "result": {"thread": {"id": "thread"}}})).unwrap();
     let turn = outgoing.try_recv().unwrap();
     assert_eq!(turn["method"], "turn/start");
@@ -577,4 +577,20 @@ fn next_turn_receives_the_saved_search_setting_and_file_authority_uses_only_user
     assert_eq!(outgoing.try_recv().unwrap()["params"]["webSearch"], false);
     app.chatgpt.clear();
     assert!(execute_tool(&mut app, "wordcraft_read_file", &json!({"path": path})).is_err());
+}
+
+#[test]
+fn whole_document_inspection_cannot_bypass_chat_context_limits() {
+    let mut app = WordApp::new(Session::new(Document::from_text(&"secret body ".repeat(100000))), Services::default());
+    for tool in ["wordcraft_inspect", "wordcraft_execute"] {
+        let result = execute_tool(&mut app, tool, &json!({"command":"document.inspect"})).unwrap();
+        assert!(result.to_string().len() < 4000);
+        assert!(!result.to_string().contains("secret body"));
+    }
+    let result = execute_tool(&mut app, "wordcraft_document", &json!({"mode":"read","path":[0]})).unwrap();
+    assert!(result["next"].is_object());
+    assert!(result["text"].as_str().unwrap().len() <= 2048);
+    let nested = tool_result(Ok(json!({"blocks":[{"nested":"x".repeat(100000)}]})));
+    assert_eq!(nested["success"], true);
+    assert!(nested.to_string().len() < 1000);
 }

@@ -28,6 +28,8 @@ README continues below; an unchanged copy is also kept in [README_original.md](R
 
 - **ChatGPT sidebar:** a collapsible right pane with one conversation, streamed replies,
   account settings and a model picker showing models available to your account.
+- **Large-document support:** ChatGPT searches and reads relevant ranges instead of loading the
+  whole document. Working context is reduced automatically as the conversation grows.
 - **Document editing:** ChatGPT can inspect and edit the loaded document through WordCraft's
   command system, including formatting, tables, styles, layout and review. Edits support normal Undo.
 - **Selected-text context:** select text and click the ChatGPT icon in the floating mini toolbar.
