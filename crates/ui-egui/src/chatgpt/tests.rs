@@ -594,3 +594,125 @@ fn whole_document_inspection_cannot_bypass_chat_context_limits() {
     assert_eq!(nested["success"], true);
     assert!(nested.to_string().len() < 1000);
 }
+
+#[test]
+fn streamed_reply_keeps_sidebar_header_and_composer_on_screen() {
+    use egui_kittest::kittest::Queryable;
+    let mut app = app();
+    app.chatgpt.open = true;
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("test@example.com".into());
+    app.chatgpt.busy = true;
+    app.chatgpt.thread = Some("t".into());
+    app.chatgpt.document = Some(app.session.document_id());
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(5);
+    for text in [
+        "A short answer.".to_owned(),
+        format!("\n\n```text\n{}\n```", "unbroken_text_".repeat(200)),
+        format!("\n\n| {} |\n| {} |\n| {} |", vec!["Column"; 32].join(" | "), vec!["---"; 32].join(" | "), vec!["Content"; 32].join(" | ")),
+    ] {
+        harness
+            .state_mut()
+            .chatgpt
+            .notification(&egui::Context::default(), "item/agentMessage/delta", &json!({"threadId":"t","itemId":"reply","delta":text}))
+            .unwrap();
+        harness.run_steps(5);
+        assert!(harness.state().chatgpt.open);
+        for label in ["Chat options", "Message ChatGPT"] {
+            let rect = harness.get_by_label(label).rect();
+            assert!(rect.min.x >= 0.0 && rect.max.x <= 1440.0 && rect.min.y >= 0.0 && rect.max.y <= 900.0, "{label}: {rect:?}");
+        }
+    }
+}
+
+#[test]
+fn active_chat_survives_agent_focus_mode_and_can_be_reopened() {
+    use egui_kittest::kittest::Queryable;
+    let mut app = app();
+    app.chatgpt.open = true;
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("test@example.com".into());
+    app.chatgpt.busy = true;
+    app.chatgpt.thread = Some("t".into());
+    app.chatgpt.turn = Some("turn".into());
+    app.chatgpt.document = Some(app.session.document_id());
+    tool_call(
+        &mut app,
+        &json!({"threadId":"t","turnId":"turn","tool":"wordcraft_execute", "arguments":{"command":"view.focus","params":{"value":true}}}),
+    )
+    .unwrap();
+    assert!(app.session.view.focus_mode);
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(5);
+    assert!(harness.query_by_label("Chat options").is_some(), "Focus mode must keep the active chat reachable");
+    harness
+        .state_mut()
+        .chatgpt
+        .notification(
+            &egui::Context::default(),
+            "item/agentMessage/delta",
+            &json!({"threadId":"t","itemId":"reply","delta":"The document says hello."}),
+        )
+        .unwrap();
+    harness.run_steps(3);
+    assert!(harness.query_by_label("Message ChatGPT").is_some());
+    harness.state_mut().execute("ui.chatgpt.toggle", json!({"value":false})).unwrap();
+    harness.run_steps(2);
+    assert!(harness.query_by_label("Chat options").is_none());
+    harness.get_by_role_and_label(egui::accesskit::Role::Button, "ChatGPT").click();
+    harness.run_steps(3);
+    assert!(!harness.state().session.view.focus_mode);
+    assert!(harness.query_by_label("Chat options").is_some());
+    assert!(harness.state().chatgpt.messages.iter().any(|m| m.text == "The document says hello."));
+}
+
+#[test]
+#[ignore = "manual native GPU screenshot; no account or network required"]
+fn sidebar_streaming_layout_preview() {
+    let mut app = app();
+    app.integrated_titlebar = true;
+    app.chatgpt.open = true;
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("Preview account".into());
+    app.chatgpt.busy = true;
+    app.chatgpt.activity = "Reading document…".into();
+    app.chatgpt.push(
+        "ChatGPT",
+        format!(
+            "## Document answer\n\nA wide table stays inside the chat history.\n\n| {} |\n| {} |\n| {} |",
+            vec!["Column"; 24].join(" | "),
+            vec!["---"; 24].join(" | "),
+            vec!["Document context"; 24].join(" | ")
+        ),
+        None,
+    );
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(5);
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
+    harness.render().unwrap().save(root.join("chatgpt-sidebar-wide-reply.png")).unwrap();
+    harness.state_mut().session.run("view.focus", &json!({"value":true})).unwrap();
+    harness.run_steps(4);
+    harness.render().unwrap().save(root.join("chatgpt-sidebar-focus-reply.png")).unwrap();
+}

@@ -1,6 +1,6 @@
 # ChatGPT document assistant
 
-Last updated: 2026-10-15 · M0 extension: bounded document retrieval and automatic working memory.
+Last updated: 2026-10-15 · M0 fix: keep streaming chat visible through wide replies and Focus mode.
 
 ## Sign in from WordCraft
 
@@ -173,6 +173,8 @@ preferences and document files.
 
 ## Conversation and document access
 
+The sidebar remains available in Focus mode, including when a document command changes the view during a reply. Wide Markdown tables and code scroll horizontally inside the history area, keeping the header and composer within the window. The assistant is instructed to change view modes, panes and zoom only when requested.
+
 One conversation belongs to the loaded document. Collapsing the sidebar keeps it; **⋯ → Clear
 conversation**, replacing the document, switching accounts/models or restarting the application
 starts a new one. History is currently in memory only. Failed turns preserve working context and mark interrupted tool outcomes as uncertain, so the assistant must inspect before retrying an edit.
@@ -250,6 +252,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-15 | Keep ChatGPT outside Focus-mode pane suppression and contain wide streamed Markdown inside the history viewport |
 | 2026-10-15 | Bounded overview, literal search and paged document reads; automatic working-memory checkpoints and context-limit recovery |
 | 2026-10-15 | Default-on web search with persisted switch and source citations, user-referenced file reader, and right-click Add to Chat |
 | 2026-10-15 | Selection references in the mini toolbar/composer, document navigation and native Markdown/equation previews |

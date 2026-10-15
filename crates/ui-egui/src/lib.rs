@@ -2029,6 +2029,10 @@ impl WordApp {
             if !self.session.view.focus_mode {
                 ribbon::show(self, ui);
                 chrome::status_bar(self, ui);
+            }
+            // Chat stays reachable during Focus mode, including view changes requested by an agent.
+            chatgpt::show(self, ui);
+            if !self.session.view.focus_mode {
                 panes::show(self, ui);
             }
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |ui| {
