@@ -2686,3 +2686,9 @@ preview	Title	Пример
 
 	Sign in in your browser. WordCraft saves the credentials and connects automatically. Login persists after restart.	Sign in in your browser. WordCraft saves the credentials and connects automatically. Login persists after restart.
 	Keep credential JSON private. Never share it or commit it to Git. Clear your clipboard after importing.	Keep credential JSON private. Never share it or commit it to Git. Clear your clipboard after importing.
+
+	Add selection to ChatGPT	Add selection to ChatGPT
+
+	Remove reference	Remove reference
+
+	Show referenced text	Show referenced text

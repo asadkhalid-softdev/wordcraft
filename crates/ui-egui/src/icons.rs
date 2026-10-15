@@ -80,6 +80,12 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
     let green = Color32::from_rgb(0x2E, 0x8B, 0x57);
     let orange = Color32::from_rgb(0xE0, 0x7B, 0x1F);
     match name {
+        "chatgpt" => {
+            // Original assistant mark: a speech bubble and a four-point sparkle.
+            pen.closed(&[(2.0, 3.0), (15.0, 3.0), (15.0, 13.0), (8.0, 13.0), (4.0, 17.0), (4.0, 13.0), (2.0, 13.0)], c);
+            pen.fill(&[(14.0, 6.0), (15.3, 9.0), (18.0, 10.3), (15.3, 11.6), (14.0, 14.5), (12.7, 11.6), (10.0, 10.3), (12.7, 9.0)], a);
+            pen.lines(5.0, 10.0, &[6.5, 9.0]);
+        }
         // Clipboard
         "paste" => {
             pen.rect(4.0, 3.5, 14.0, 17.0, c);

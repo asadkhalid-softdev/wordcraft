@@ -19,6 +19,8 @@ wordcraft-render = { workspace = true }
 wordcraft-engine = { workspace = true }
 wordcraft-zotero = { workspace = true }
 egui = { workspace = true }
+egui_commonmark = { version = "0.25", default-features = false }
+pulldown-cmark = { version = "0.13", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }

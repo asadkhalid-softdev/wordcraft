@@ -313,3 +313,204 @@ fn browser_login_result_connects_automatically_and_preserves_document() {
     assert!(app.chatgpt.auth_json.is_empty());
     assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Hello world");
 }
+
+#[test]
+fn text_references_capture_navigate_relocate_and_reject_changed_text() {
+    let mut app = app();
+    assert!(app.execute("ui.chatgpt.attachSelection", json!({})).is_err());
+    app.execute("select.text", json!({"text": "world"})).unwrap();
+    let revision = app.session.rev();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    assert_eq!(app.chatgpt.references.len(), 1, "duplicate attachments are ignored");
+    assert!(app.chatgpt.open && app.chatgpt.focus_composer);
+    assert_eq!(app.session.rev(), revision);
+    assert_eq!(app.chatgpt.references[0].text, "world");
+    assert!(!app.chatgpt.references[0].label().contains("world"));
+    app.execute("caret.docStart", json!({})).unwrap();
+    app.execute("ui.chatgpt.showReference", json!({"id": 1})).unwrap();
+    assert_eq!(app.session.selected_text(), "world");
+    assert!(app.canvas.scroll_to_caret);
+    assert_eq!(app.session.rev(), revision);
+    app.execute("caret.docStart", json!({})).unwrap();
+    app.execute("text.insert", json!({"text": "Intro: "})).unwrap();
+    app.execute("ui.chatgpt.showReference", json!({"id": 1})).unwrap();
+    assert_eq!(app.session.selected_text(), "world");
+    assert_eq!(app.session.sel.anchor.off, 13);
+    app.execute("text.insert", json!({"text": "changed"})).unwrap();
+    assert!(app.execute("ui.chatgpt.showReference", json!({"id": 1})).is_err());
+    assert!(app.execute("ui.chatgpt.send", json!({"text": "Rewrite it"})).is_err());
+    assert_eq!(app.chatgpt.references.len(), 1);
+    app.execute("ui.chatgpt.removeReference", json!({"id": 1})).unwrap();
+    assert!(app.chatgpt.references.is_empty());
+    assert!(app.execute("ui.chatgpt.removeReference", json!({"id": u64::MAX})).is_err());
+    assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Intro: Hello changed");
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn sending_references_includes_hidden_context_and_preserves_navigable_history() {
+    let mut app = app();
+    let ctx = egui::Context::default();
+    app.execute("select.text", json!({"text": "world"})).unwrap();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    let (client, outgoing) = desktop::Client::test_pair();
+    app.chatgpt.client = Some(client);
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("test@example.com".into());
+    app.chatgpt.thread = Some("thread".into());
+    app.execute("select.text", json!({"text": "Hello"})).unwrap();
+    app.execute("ui.chatgpt.send", json!({"text": "Make this concise"})).unwrap();
+    let sent = outgoing.try_recv().unwrap();
+    let input = sent.pointer("/params/input/0/text").unwrap().as_str().unwrap();
+    assert!(input.contains("Make this concise") && input.contains("untrusted context"));
+    assert!(input.contains("world") && input.contains("\"off\":6"));
+    assert!(app.chatgpt.references.is_empty());
+    let message = app.chatgpt.messages.last().unwrap();
+    assert_eq!(message.text, "Make this concise");
+    assert_eq!(message.references[0].text, "world");
+    app.execute("ui.chatgpt.showReference", json!({"id": 1})).unwrap();
+    assert_eq!(app.session.selected_text(), "world");
+    app.chatgpt.notification(&ctx, "turn/completed", &json!({"threadId": "thread", "turn": {"status": "completed"}})).unwrap();
+    app.execute("file.new", json!({"force": true})).unwrap();
+    poll(&mut app, &ctx);
+    assert!(app.chatgpt.messages.is_empty() && app.chatgpt.references.is_empty());
+    assert!(app.execute("ui.chatgpt.showReference", json!({"id": 1})).is_err());
+}
+
+#[test]
+fn references_support_unicode_multiple_paragraphs_and_size_limits() {
+    let mut app = WordApp::new(Session::new(Document::from_text("Before\nCafé αβ\nThird line\nAfter")), Services::default());
+    app.execute("select.range", json!({"anchor": {"block": 1, "off": 0}, "focus": {"block": 2, "off": 5}})).unwrap();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    assert_eq!(app.chatgpt.references[0].text, "Café αβ\nThird");
+    app.execute("caret.docStart", json!({})).unwrap();
+    app.execute("text.insert", json!({"text": "Prefix "})).unwrap();
+    app.execute("ui.chatgpt.showReference", json!({"id": 1})).unwrap();
+    assert_eq!(app.session.selected_text(), "Café αβ\nThird");
+    app.chatgpt.clear();
+    assert!(app.chatgpt.references.is_empty());
+    let mut big = WordApp::new(Session::new(Document::from_text(&"a".repeat(MAX_PROMPT + 1))), Services::default());
+    big.execute("select.all", json!({})).unwrap();
+    assert!(big.execute("ui.chatgpt.attachSelection", json!({})).is_err());
+    assert!(big.chatgpt.references.is_empty());
+}
+
+#[test]
+fn markdown_keeps_tables_code_and_math_but_blocks_images_and_unsafe_links() {
+    let markdown = "# Heading\n\n**bold** *italic*\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n```rust\nlet x = 1;\n```\n\n[Docs](https://example.com) ![private](file:///C:/secret.txt) [bad](javascript:alert)";
+    let safe = markdown::safe_markdown(markdown);
+    assert!(safe.contains("| A | B |") && safe.contains("```rust") && safe.contains("**bold**"));
+    assert!(safe.contains("https://example.com"));
+    assert!(!safe.contains("file://") && !safe.contains("javascript:"));
+    assert!(safe.contains("private") && safe.contains("bad"));
+    let math = markdown::normalize_math(r"Inline \(x^2\), display \[\frac{a}{b}\]. Code: `\(unchanged\)`");
+    assert!(math.contains("$x^2$") && math.contains(r"$$\frac{a}{b}$$"));
+    assert!(math.contains(r"`\(unchanged\)`"));
+    assert_eq!(markdown::normalize_math("```tex\n\\[literal\\]\n```"), "```tex\n\\[literal\\]\n```");
+}
+
+#[test]
+fn reference_links_select_text_and_hover_remove_leaves_document_untouched() {
+    use egui_kittest::kittest::Queryable;
+    let mut app = app();
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("test@example.com".into());
+    app.execute("select.text", json!({"text": "world"})).unwrap();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    app.execute("select.collapse", json!({})).unwrap();
+    let label = app.chatgpt.references[0].label();
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(4);
+    harness.get_by_label(&label).click();
+    harness.run_steps(3);
+    assert_eq!(harness.state().session.selected_text(), "world");
+    harness.get_by_label("Remove reference").click();
+    harness.run_steps(3);
+    assert!(harness.state().chatgpt.references.is_empty());
+    assert_eq!(harness.state().session.doc.plain_text(StoryRef::Body), "Hello world");
+}
+
+#[test]
+#[ignore = "manual native GPU screenshot; no account or network required"]
+fn reference_and_markdown_preview() {
+    use egui_kittest::kittest::Queryable;
+    let mut app = WordApp::new(Session::new(wordcraft_engine::sample::sample_document()), Services::default());
+    app.integrated_titlebar = true;
+    app.execute("select.text", json!({"text": "The Open Studio Handbook"})).unwrap();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("Preview account".into());
+    app.chatgpt.draft = "Make the selected title more engaging".into();
+    app.chatgpt.push("ChatGPT", "## Suggested structure\n\nKeep the introduction **short** and use a clear list:\n\n- Welcome new members\n- Explain *shared responsibilities*\n\n| Section | Focus |\n| --- | --- |\n| Welcome | Getting started |\n| Studio | Equipment and care |\n\n```text\nA place to make things together\n```\n\nFor a formula: \\(x^2 + y^2 = z^2\\).".into(), None);
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 1000.0)).with_pixels_per_point(1.5).wgpu().build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.input_mut().max_texture_side = Some(8192);
+    harness.run_steps(8);
+    harness.get_by_label("Selected text 1 · 4 words").hover();
+    harness.run_steps(3);
+    harness.render().unwrap().save(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/chatgpt-context-preview.png")).unwrap();
+    harness.state_mut().canvas.mini_dismissed = None;
+    harness.run_steps(3);
+    harness.render().unwrap().save(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/chatgpt-selection-toolbar.png")).unwrap();
+}
+
+#[test]
+fn references_enforce_attachment_count_and_refuse_ambiguous_relocation() {
+    let mut app = WordApp::new(Session::new(Document::from_text("one two three four five six seven eight nine")), Services::default());
+    for word in ["one", "two", "three", "four", "five", "six", "seven", "eight"] {
+        app.execute("select.text", json!({"text": word})).unwrap();
+        app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    }
+    app.execute("select.text", json!({"text": "nine"})).unwrap();
+    assert!(app.execute("ui.chatgpt.attachSelection", json!({})).is_err());
+    assert_eq!(app.chatgpt.references.len(), 8);
+    app.chatgpt.clear();
+    app.execute("select.text", json!({"text": "one two three four five six seven eight nine"})).unwrap();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    app.execute("caret.docStart", json!({})).unwrap();
+    app.execute("text.insert", json!({"text": "one two three four five six seven eight nine\n"})).unwrap();
+    assert!(app.execute("ui.chatgpt.showReference", json!({"id": 1})).is_err());
+}
+
+#[test]
+fn assistant_markdown_renders_table_cells_and_headings_instead_of_source_markers() {
+    use egui_kittest::kittest::Queryable;
+    let mut app = app();
+    app.chatgpt.open = true;
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("test@example.com".into());
+    app.chatgpt.push(
+        "ChatGPT",
+        "## Suggested outline\n\n**Strong text**\n\n| Section | Focus |\n|---|---|\n| Welcome | Getting started |\n\n```rust\nlet count = 1;\n```"
+            .into(),
+        None,
+    );
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 1000.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(4);
+    assert!(harness.query_by_label("Suggested outline").is_some());
+    assert!(harness.query_by_label("Section").is_some());
+    assert!(harness.query_by_label("Getting started").is_some());
+    assert!(harness.query_by_label("## Suggested outline").is_none());
+    assert!(harness.query_by_label("| Section | Focus |").is_none());
+}

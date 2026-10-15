@@ -100,6 +100,39 @@ access or reports a usage limit, review account/workspace policy and
 [ChatGPT Settings → Usage](https://chatgpt.com/settings/usage). A successful browser login does
 not itself guarantee that the account has eligible inference access.
 
+## Add selected text to a message
+
+1. Select a continuous range in the document. The floating **mini toolbar** appears.
+2. Click its **ChatGPT** speech-bubble/sparkle icon (**Add selection to ChatGPT**). The sidebar
+   opens and attaches the selection to your next message.
+3. Type a request, such as “Rewrite this more clearly”, and send it. The assistant receives the
+   full excerpt and its document range, even if you select other text before sending.
+
+The composer displays a compact **Selected text …** reference link instead of the excerpt.
+Click the link to select and reveal the source range. Hover the reference to reveal **×**, or
+focus its remove control with the keyboard, to remove it before sending. Removing a reference
+changes only the draft. Sent messages retain clickable references in chat history.
+
+You can attach up to eight selections, totaling at most 32,000 bytes. Attachments are in memory
+only, belong to the current document, and clear with the conversation. Sign-in preserves a draft's
+attachments. After edits, navigation relocates an unchanged excerpt using nearby text; changed,
+ambiguous or excessively large searches ask you to select it again instead of guessing a range.
+A missing or changed reference also prevents sending that draft until it is removed or replaced.
+Rectangular column selections and whole-cell selections require a continuous text selection.
+
+## Formatted replies
+
+Assistant messages use a native CommonMark/GitHub Markdown preview: headings, emphasis, lists,
+quotes, links, tables, strikethrough, task lists and fenced code blocks with copy controls.
+Supported LaTeX equations render through WordCraft's equation engine, including `$…$`, `$$…$$`,
+`\(…\)` and `\[…\]`. Code examples retain their literal source. This is a Rust-native renderer,
+not ChatGPT's website or its proprietary UI. Unsupported LaTeX commands may remain visible as
+text within the equation; equation size and count are bounded for responsiveness.
+
+Images are shown as their alternative text and never fetched from a model-provided URL or local
+file path. Clickable external links allow HTTP, HTTPS and mail links. User messages remain literal
+text so document excerpts and user input are not interpreted as formatting instructions.
+
 ## Conversation and document access
 
 One conversation belongs to the loaded document. Collapsing the sidebar keeps it; **⋯ → Clear
@@ -142,6 +175,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-15 | Selection references in the mini toolbar/composer, document navigation and native Markdown/equation previews |
 | 2026-10-15 | Simplified chat controls to Clear conversation and Sign out; both cancel active replies |
 | 2026-10-15 | Standalone WordCraft browser sign-in, automatic credential import, bundled Rust JSON helper and first-party setup guide |
 | 2026-10-15 | OAuth JSON import, protected persistence, direct streaming inference and settings/model picker |

@@ -10,6 +10,11 @@ The sidebar provides one chat, streamed replies, **⋯ → Clear conversation**,
 and an account-specific model picker. Login persists across restarts. Chat history currently lasts
 for the app session and resets when another document opens.
 
+Select document text and click the **ChatGPT icon** in the floating mini toolbar to attach it to
+your next message. A compact reference link appears above the chat input; click it to highlight
+the source text, or hover and click **×** to remove it. Replies render Markdown tables, headings,
+lists, code blocks and supported LaTeX equations.
+
 ## Run on native Windows
 
 With Rust and the Windows build prerequisites installed, open PowerShell in this repository:

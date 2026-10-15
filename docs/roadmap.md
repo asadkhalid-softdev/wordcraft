@@ -1,6 +1,6 @@
 # WordCraft roadmap: milestones and what's next
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously minor (Czech proofing review fixes; previously minor: Portuguese proofing; previously minor: Polish interface and Polish proofing; previously trivial: M7: formatting revisions landed, #41; previously trivial: M5: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: alpha gate checked: six core workflows pass; previously major: milestones moved here from ROADMAP.md; Current focus set from the re-measured gaps) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously minor (Czech proofing review fixes; previously minor: Portuguese proofing; previously minor: Polish interface and Polish proofing; previously trivial: M7: formatting revisions landed, #41; previously trivial: M5: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: alpha gate checked: six core workflows pass; previously major: milestones moved here from ROADMAP.md; Current focus set from the re-measured gaps) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 Forward-looking plan. The summary is [`ROADMAP.md`](../ROADMAP.md); the ranked work list is
 [`gaps.md`](gaps.md); the numbers are in [`target-app-parity.md`](target-app-parity.md). Hours are
@@ -77,6 +77,7 @@ languages, screen-reader access, ecosystem decisions (VBA, add-ins, cloud), an i
 | Date | Change | Summary |
 |---|---|---|
 | 2026-10-15 | minor | WordCraft-owned browser login, automatic credential storage and standalone documentation |
+| 2026-10-15 | minor | ChatGPT selection references, source navigation and native Markdown/equation previews |
 | 2026-10-15 | minor | Removed Stop and Disconnect controls; Clear conversation and Sign out cancel active replies |
 | 2026-10-15 | minor | Standalone ChatGPT browser sign-in, automatic credential import and bundled Rust helper |
 | 2026-10-15 | minor | ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands |

@@ -33,10 +33,10 @@ const COMBO_SIZE_W: f32 = 52.0;
 const GAP: f32 = 3.0;
 /// Row 2, like Word's: B I U S | highlight, font colour | the four alignments. Fourteen
 /// allocations, so thirteen gaps; the two inside the split buttons are counted in `SPLIT_W`.
-const ROW2_W: f32 = 8.0 * BTN_W + 2.0 * SPLIT_W + 2.0 * SEP_W + 11.0 * SPACING;
+const ROW2_W: f32 = 9.0 * BTN_W + 2.0 * SPLIT_W + 2.0 * SEP_W + 12.0 * SPACING;
 /// Row 1: font, size, grow, shrink. The font box takes what row 2 leaves, so both rows end
 /// together and the box starts at the bar's left edge.
-const COMBO_FONT_W: f32 = ROW2_W - (COMBO_SIZE_W + GAP + 2.0 * BTN_W + 3.0 * SPACING);
+const COMBO_FONT_W: f32 = ROW2_W - (COMBO_SIZE_W + GAP + 3.0 * BTN_W + 4.0 * SPACING);
 
 /// The bar's size: fixed, so it never jitters as the selection changes, and wide enough for every
 /// control of both rows (#535: one row of a fixed width cut off everything after Align Left).
@@ -238,6 +238,7 @@ fn content(app: &mut WordApp, ui: &mut egui::Ui, t: &Tokens) {
         ui.add_space(GAP);
         widgets::small(ui, app, "grow", None, "Increase Font Size", "format.growFont", json!({}), false);
         widgets::small(ui, app, "shrink", None, "Decrease Font Size", "format.shrinkFont", json!({}), false);
+        widgets::small(ui, app, "chatgpt", None, "Add selection to ChatGPT", "ui.chatgpt.attachSelection", json!({}), false);
     });
 
     row(ui, app, &|ui, app| {
@@ -480,6 +481,21 @@ mod tests {
         );
         steps(&mut h);
         h
+    }
+
+    #[test]
+    fn chatgpt_action_attaches_the_selection_without_editing_it() {
+        use egui_kittest::kittest::Queryable;
+        let mut h = bar_over("brown fox");
+        let revision = h.state().session.rev();
+        h.get_by_label("Add selection to ChatGPT").click();
+        steps(&mut h);
+        let status = h.state_mut().execute("ui.chatgpt.status", json!({})).unwrap();
+        assert_eq!(status["open"], true);
+        assert_eq!(status["references"], 1);
+        assert_eq!(h.state().session.rev(), revision);
+        assert_eq!(h.state().session.selected_text(), "brown fox");
+        assert!(h.query_by_label("Selected text 1 · 2 words").is_some());
     }
 
     fn steps(h: &mut egui_kittest::Harness<'static, WordApp>) {
