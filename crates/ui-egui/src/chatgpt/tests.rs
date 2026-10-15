@@ -57,16 +57,16 @@ fn all_engine_commands_are_discoverable_and_ui_recursion_is_refused() {
 }
 
 #[test]
-fn stale_stopped_and_cross_document_tool_calls_cannot_edit() {
+fn stale_inactive_and_cross_document_tool_calls_cannot_edit() {
     let mut app = app();
     app.chatgpt.busy = true;
     app.chatgpt.thread = Some("thread".into());
     app.chatgpt.turn = Some("turn".into());
     app.chatgpt.document = Some(app.session.document_id());
     let mut call = json!({"threadId": "thread", "turnId": "turn", "tool": "wordcraft_execute", "arguments": {"command": "text.insert", "params": {"text": "safe"}}});
-    app.chatgpt.stopping = true;
+    app.chatgpt.busy = false;
     assert!(tool_call(&mut app, &call).is_err());
-    app.chatgpt.stopping = false;
+    app.chatgpt.busy = true;
     call["turnId"] = json!("old-turn");
     assert!(tool_call(&mut app, &call).is_err());
     call["turnId"] = json!("turn");
@@ -134,7 +134,7 @@ fn sidebar_commands_collapse_without_clearing_and_clear_without_editing() {
 
 #[test]
 fn typing_in_chat_leaves_the_document_untouched_and_menu_clears_history() {
-    use egui_kittest::kittest::Queryable;
+    use egui_kittest::kittest::{NodeT, Queryable};
     let mut app = app();
     app.chatgpt.open = true;
     app.chatgpt.ready = true;
@@ -175,7 +175,11 @@ fn typing_in_chat_leaves_the_document_untouched_and_menu_clears_history() {
     }
     harness.get_by_label("Chat options").click();
     harness.run_steps(2);
-    // Disconnect the fake transport before Clear; this test must never launch a real client.
+    assert!(harness.query_by_label("Stop").is_none());
+    assert!(harness.query_by_label("Disconnect").is_none());
+    assert!(!harness.get_by_label("Sign out").accesskit_node().is_disabled());
+    assert!(!commands(harness.state()).iter().any(|command| command["id"] == "ui.chatgpt.stop"));
+    // Disable the fake transport before Clear; this test must never launch a real client.
     harness.state_mut().chatgpt.ready = false;
     harness.get_by_label("Clear conversation").click();
     harness.run_steps(2);
@@ -185,7 +189,7 @@ fn typing_in_chat_leaves_the_document_untouched_and_menu_clears_history() {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
-fn protocol_round_trip_from_account_to_edit_and_stop() {
+fn protocol_round_trip_from_account_to_edit_and_clear() {
     let mut app = app();
     let ctx = egui::Context::default();
     let (client, outgoing) = desktop::Client::test_pair();
@@ -217,7 +221,11 @@ fn protocol_round_trip_from_account_to_edit_and_stop() {
     assert_eq!(reply["id"], "tool-1");
     assert_eq!(reply["result"]["success"], true);
     assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Revised Hello world");
-    app.chatgpt.stop(&ctx).unwrap();
+    app.chatgpt.clear();
+    assert!(app.chatgpt.messages.is_empty());
+    assert!(app.chatgpt.pending.is_empty());
+    assert!(app.chatgpt.thread.is_none());
+    assert!(app.chatgpt.turn.is_none());
     assert!(app.chatgpt.client.is_none());
     assert!(tool_call(&mut app, &call["params"]).is_err());
     assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Revised Hello world");

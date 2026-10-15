@@ -6,7 +6,7 @@ This fork adds a collapsible ChatGPT sidebar to WordCraft. ChatGPT can read and 
 document through WordCraft’s command system, including formatting, tables, styles, layout,
 references and review. Edits use normal Undo and protect unsaved work.
 
-The sidebar provides one chat, streamed replies, Stop, **⋯ → Clear conversation**, account settings
+The sidebar provides one chat, streamed replies, **⋯ → Clear conversation**, account settings
 and an account-specific model picker. Login persists across restarts. Chat history currently lasts
 for the app session and resets when another document opens.
 

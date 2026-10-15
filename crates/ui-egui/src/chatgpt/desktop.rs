@@ -45,9 +45,6 @@ impl Client {
     pub fn send(&self, value: Value) -> Result<(), String> {
         self.outgoing.try_send(value).map_err(|_| "ChatGPT connection is unavailable or busy. Reconnect and try again.".into())
     }
-    pub fn stop(&self) {
-        self.cancelled.store(true, Ordering::Relaxed);
-    }
 }
 struct Worker {
     http: Result<reqwest::blocking::Client, String>,

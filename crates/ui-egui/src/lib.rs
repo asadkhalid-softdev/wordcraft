@@ -2395,7 +2395,6 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.chatgpt.import"
             | "ui.chatgpt.logout"
             | "ui.chatgpt.clear"
-            | "ui.chatgpt.stop"
             | "ui.chatgpt.status"
             | "ui.tab"
             | "ui.backstage"

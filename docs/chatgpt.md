@@ -105,7 +105,8 @@ not itself guarantee that the account has eligible inference access.
 One conversation belongs to the loaded document. Collapsing the sidebar keeps it; **⋯ → Clear
 conversation**, replacing the document, switching accounts/models or restarting the application
 starts a new one. History is currently in memory only. Failed turns discard the backend context.
-**Stop** cancels document actions immediately and disconnects the worker; reconnect to continue.
+**Clear conversation** and **Sign out** cancel pending document actions immediately. Clearing keeps
+your saved login and reconnects automatically; signing out removes the saved credentials.
 An in-flight HTTPS request may finish in the background, but cannot dispatch more document actions.
 Earlier edits remain and can be reversed with normal Undo. Ctrl+Enter (Cmd+Enter on macOS) sends;
 ordinary Enter adds a newline.
@@ -133,7 +134,7 @@ are compiled only for native desktop.
 
 Offline tests cover PKCE, loopback callback validation, nonce and signed ID-token checks, cancellation, signed access-token validation, private atomic credential replacement, malformed
 imports, bounded SSE parsing, completed-response gating, document command discovery/editing/Undo,
-stale and stopped tool calls, and settings/credential isolation. Headless screenshots inspect the
+stale and cancelled tool calls, and settings/credential isolation. Headless screenshots inspect the
 sidebar and settings popup. Live sign-in, account model discovery and a real inference turn still
 require an interactive account check. No real credential JSON is used in tests or committed.
 
@@ -141,6 +142,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-15 | Simplified chat controls to Clear conversation and Sign out; both cancel active replies |
 | 2026-10-15 | Standalone WordCraft browser sign-in, automatic credential import, bundled Rust JSON helper and first-party setup guide |
 | 2026-10-15 | OAuth JSON import, protected persistence, direct streaming inference and settings/model picker |
 | 2026-10-15 | Initial document sidebar and command tools |

@@ -73,7 +73,6 @@ pub struct State {
     ready: bool,
     connecting: bool,
     busy: bool,
-    stopping: bool,
     active_at: Option<f64>,
     error: Option<String>,
     activity: String,
@@ -102,7 +101,6 @@ impl State {
         self.ready = false;
         self.connecting = false;
         self.busy = false;
-        self.stopping = false;
         self.importing = false;
         self.logging_in = false;
         self.login_url = None;
@@ -116,7 +114,7 @@ impl State {
     }
 
     fn clear(&mut self) {
-        // Closing the process discards the ephemeral server conversation too, including
+        // Dropping the worker discards the ephemeral conversation too, including
         // queued tools and a turn that hasn't received its id yet. Saved login is retained.
         self.disconnect();
         self.messages.clear();
@@ -213,7 +211,7 @@ impl State {
             return Err("Sign in with ChatGPT first".into());
         }
         if self.busy {
-            return Err("Wait for the current reply or stop it first".into());
+            return Err("Wait for the current reply or clear the conversation first".into());
         }
         let prompt = prompt.trim();
         if prompt.is_empty() {
@@ -228,7 +226,6 @@ impl State {
         self.document = Some(document);
         self.busy = true;
         self.active_at = Some(ctx.input(|i| i.time));
-        self.stopping = false;
         self.error = None;
         self.activity = "Thinking…".into();
         let result = if self.thread.is_some() {
@@ -254,17 +251,19 @@ impl State {
         result
     }
 
-    fn stop(&mut self, _ctx: &egui::Context) -> Result<(), String> {
-        if !self.busy {
-            return Ok(());
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        if let Some(client) = &self.client {
-            client.stop();
-        }
-        self.disconnect();
-        self.error = Some("Reply stopped. Earlier document actions remain; use Undo if needed. Reconnect to continue.".into());
-        Ok(())
+    #[cfg(not(target_arch = "wasm32"))]
+    fn logout(&mut self, ctx: &egui::Context) -> Result<(), String> {
+        // Drop the active worker first so queued document actions cannot run during sign-out.
+        self.clear();
+        clear_auth_input(self);
+        self.client = Some(desktop::Client::start(&self.model, ctx.clone())?);
+        self.connecting = true;
+        self.request(ctx, "account/logout", json!({}), Request::Logout)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn logout(&mut self, _ctx: &egui::Context) -> Result<(), String> {
+        Err("ChatGPT integration is available in the WordCraft desktop app".into())
     }
 
     fn response(&mut self, ctx: &egui::Context, value: &Value) -> Result<(), String> {
@@ -369,7 +368,6 @@ impl State {
             "turn/completed" => {
                 self.busy = false;
                 self.active_at = None;
-                self.stopping = false;
                 self.turn = None;
                 self.activity.clear();
                 if let Some(message) = p.pointer("/turn/error/message").and_then(Value::as_str) {
@@ -566,12 +564,11 @@ fn receive(app: &mut WordApp, ctx: &egui::Context, value: Value) -> Result<(), S
     }
 }
 
-/// Validate ownership immediately before each call, including calls queued before Stop.
+/// Validate ownership immediately before each call, including calls queued before clearing a conversation or signing out.
 fn tool_call(app: &mut WordApp, p: &Value) -> Result<Value, String> {
     let thread = p.get("threadId").and_then(Value::as_str);
     let turn = p.get("turnId").and_then(Value::as_str);
     if !app.chatgpt.busy
-        || app.chatgpt.stopping
         || thread.is_none()
         || turn.is_none()
         || thread != app.chatgpt.thread.as_deref()
@@ -617,7 +614,6 @@ pub fn commands(app: &WordApp) -> Vec<Value> {
         ("logout", "Sign out of ChatGPT", "{}"),
         ("cancelLogin", "Cancel sign-in", "{}"),
         ("clear", "Clear conversation", "{} (also stops any active reply)"),
-        ("stop", "Stop reply", "{}"),
         ("send", "Send message", r#"{"text": string}"#),
         ("status", "ChatGPT status", "{}"),
     ]
@@ -655,14 +651,12 @@ pub fn command(app: &mut WordApp, id: &str, params: &Value) -> Option<Result<Val
             Ok(())
         }
         "import" => import_credentials(app, &ctx),
-        "logout" if app.chatgpt.ready && !app.chatgpt.busy => app.chatgpt.request(&ctx, "account/logout", json!({}), Request::Logout),
-        "logout" => Err("Connect first and stop the current reply before signing out".into()),
+        "logout" => app.chatgpt.logout(&ctx),
         "clear" => {
             let reconnect = app.chatgpt.ready;
             app.chatgpt.clear();
             if reconnect { app.chatgpt.connect(&ctx, &app.ui.chatgpt_model) } else { Ok(()) }
         }
-        "stop" => app.chatgpt.stop(&ctx),
         "send" => app.chatgpt.submit(&ctx, params.get("text").and_then(Value::as_str).unwrap_or(""), app.session.document_id()),
         "status" => Ok(()),
         _ => Err("Unknown ChatGPT command".into()),
@@ -681,7 +675,7 @@ fn clear_auth_input(state: &mut State) {
 
 fn import_credentials(app: &mut WordApp, ctx: &egui::Context) -> Result<(), String> {
     if app.chatgpt.busy || app.chatgpt.importing {
-        return Err("Stop the current reply before importing credentials".into());
+        return Err("Wait for the current reply or clear the conversation before importing credentials".into());
     }
     if app.chatgpt.auth_json.len() > 64_000 {
         clear_auth_input(&mut app.chatgpt);
@@ -865,12 +859,8 @@ fn panel(app: &mut WordApp, ui: &mut Ui) {
                     act(app, "clear", json!({}));
                     ui.close();
                 }
-                if ui.add_enabled(app.chatgpt.ready && !app.chatgpt.busy, egui::Button::new(crate::tl!("Sign out"))).clicked() {
+                if ui.add_enabled(app.chatgpt.ready || app.chatgpt.account.is_some(), egui::Button::new(crate::tl!("Sign out"))).clicked() {
                     act(app, "logout", json!({}));
-                    ui.close();
-                }
-                if ui.button(crate::tl!("Disconnect")).clicked() {
-                    app.chatgpt.disconnect();
                     ui.close();
                 }
                 ui.separator();
@@ -907,7 +897,7 @@ fn panel(app: &mut WordApp, ui: &mut Ui) {
     ui.label(RichText::new(crate::tl!("Chat can read and edit the loaded document. Use Undo to reverse edits.")).small().color(t.text_dim));
     ui.separator();
     let can_send = app.chatgpt.ready && app.chatgpt.account.is_some() && !app.chatgpt.busy && app.has_document();
-    // Reserve a fixed composer area; history alone scrolls, so Send/Stop stay reachable.
+    // Reserve a fixed composer area; history alone scrolls, so the composer stays reachable.
     let history_height = (ui.available_height() - 140.0).max(60.0);
     egui::ScrollArea::vertical()
         .id_salt("chatgpt_history")
@@ -955,12 +945,7 @@ fn panel(app: &mut WordApp, ui: &mut Ui) {
     // Explicit Send or Ctrl/Cmd+Enter; ordinary Enter stays inside the chat field.
     let shortcut = response.has_focus() && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Enter));
     ui.horizontal(|ui| {
-        if app.chatgpt.busy {
-            if ui.add_enabled(!app.chatgpt.stopping, egui::Button::new(crate::tl!("Stop"))).clicked() {
-                act(app, "stop", json!({}));
-            }
-        } else if ui.add_enabled(can_send && !app.chatgpt.draft.trim().is_empty(), egui::Button::new(crate::tl!("Send"))).clicked()
-            || (can_send && shortcut)
+        if ui.add_enabled(can_send && !app.chatgpt.draft.trim().is_empty(), egui::Button::new(crate::tl!("Send"))).clicked() || (can_send && shortcut)
         {
             let text = app.chatgpt.draft.clone();
             if let Some(result) = command(app, "ui.chatgpt.send", &json!({"text": text})) {
