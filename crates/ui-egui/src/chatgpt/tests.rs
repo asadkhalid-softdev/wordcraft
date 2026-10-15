@@ -330,7 +330,7 @@ fn text_references_capture_navigate_relocate_and_reject_changed_text() {
     app.execute("caret.docStart", json!({})).unwrap();
     app.execute("ui.chatgpt.showReference", json!({"id": 1})).unwrap();
     assert_eq!(app.session.selected_text(), "world");
-    assert!(app.canvas.scroll_to_caret);
+    assert_eq!(app.canvas.nav_to_pos, Some(app.session.sel.ordered().0));
     assert_eq!(app.session.rev(), revision);
     app.execute("caret.docStart", json!({})).unwrap();
     app.execute("text.insert", json!({"text": "Intro: "})).unwrap();
@@ -779,5 +779,49 @@ fn markdown_preserves_only_strict_document_destinations_with_normal_web_links() 
         let safe = markdown::safe_markdown(&source);
         assert!(!safe.contains(destination), "{safe}");
         assert!(safe.contains("Passage"));
+    }
+}
+
+#[test]
+fn reference_navigation_aligns_the_beginning_of_a_long_range_at_the_viewport_top() {
+    use wordcraft_doc::Pos;
+    use wordcraft_engine::Selection;
+    let text =
+        (0..180).map(|i| format!("Paragraph {i}. {}", "A passage with enough text to span several lines. ".repeat(5))).collect::<Vec<_>>().join("\n");
+    let mut app = WordApp::new(Session::new(Document::from_text(&text)), Services::default());
+    app.execute("ui.animations", json!({"value":"off"})).unwrap();
+    let selection = Selection { anchor: Pos::body(70, 0), focus: Pos::body(90, 0) };
+    app.execute("select.range", json!(selection)).unwrap();
+    app.execute("ui.chatgpt.attachSelection", json!({})).unwrap();
+    let quote = app.session.selected_text();
+    let citation_args = json!({"documentId":app.session.document_id(),"revision":app.session.rev(),
+        "selection":selection,"text":quote,"label":"Long passage"});
+    let citation = app.execute("ui.chatgpt.createReference", citation_args).unwrap();
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("Preview account".into());
+    app.execute("caret.docStart", json!({})).unwrap();
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(4);
+    for (command, params) in [("ui.chatgpt.showReference", json!({"id":1})), ("ui.chatgpt.showLink", json!({"url":citation["url"]}))] {
+        harness.state_mut().execute("caret.docStart", json!({})).unwrap();
+        harness.run_steps(4);
+        harness.state_mut().execute(command, params).unwrap();
+        harness.run_steps(4);
+        let app = harness.state_mut();
+        assert_eq!(app.session.sel, selection, "Keep the full selected range and its orientation");
+        let layout = app.session.layout();
+        let start = layout.caret_on(&selection.anchor, app.session.page_hint).unwrap();
+        let end = layout.caret_on(&selection.focus, app.session.page_hint).unwrap();
+        assert!(end.page > start.page, "The fixture must span pages so scrolling to its end would be wrong");
+        let page = app.canvas.page_rects.get(start.page).unwrap();
+        let relative_y = page.top() + start.top * app.canvas.scale - app.canvas.viewport.unwrap().top();
+        assert!((20.0..80.0).contains(&relative_y), "{command}: passage starts {relative_y} px below the viewport top");
     }
 }

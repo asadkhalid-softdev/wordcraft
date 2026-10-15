@@ -45,6 +45,8 @@ pub struct CanvasState {
     pub scroll_to_caret: bool,
     /// A heading navigation click aligns its page against the navigation pane, not just visible.
     pub(crate) nav_to_caret: bool,
+    /// An explicit reference jump aligns the range's beginning, preserving its selection.
+    pub(crate) nav_to_pos: Option<Pos>,
     /// Touchpad travel not yet converted to an entire reading-column turn.
     read_wheel_accum: f32,
     /// Last actual viewport seen during a resize, distinct from the committed reading page size.
@@ -166,6 +168,12 @@ pub struct CanvasState {
 }
 
 impl CanvasState {
+    pub(crate) fn reveal_selection_start(&mut self, selection: &wordcraft_engine::Selection) {
+        self.nav_to_pos = Some(selection.ordered().0);
+        self.scroll_to_caret = false;
+        self.mini_dismissed = Some(selection.clone());
+    }
+
     /// Stop a text-selection drag when the pointer gesture becomes an object drag.
     pub(crate) fn cancel_text_drag(&mut self) {
         self.dragging = false;
@@ -189,6 +197,7 @@ impl Default for CanvasState {
             markup_facts: std::cell::Cell::new(None),
             scroll_to_caret: true,
             nav_to_caret: false,
+            nav_to_pos: None,
             read_wheel_accum: 0.0,
             read_viewport: None,
             read_resized_at: 0.0,
@@ -911,9 +920,14 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         app.session.page_hint = c.page;
     }
     let mut scroll_target: Option<Rect> = None;
-    if app.canvas.nav_to_caret {
+    let nav_pos = app.canvas.nav_to_pos.take();
+    if app.canvas.nav_to_caret || nav_pos.is_some() {
         app.canvas.read_target_page = None;
-        if let Some(c) = caret
+        let destination = match nav_pos {
+            Some(pos) => layout.caret_on(&pos, app.session.page_hint),
+            None => caret,
+        };
+        if let Some(c) = destination
             && let Some(pr) = geo.rects.get(c.page)
         {
             let x = (pr.left() - GAP).max(0.0);

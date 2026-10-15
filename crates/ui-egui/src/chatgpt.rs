@@ -939,8 +939,7 @@ fn show_reference(app: &mut WordApp, id: Option<u64>) -> Result<(), String> {
         .ok_or("Unknown text reference")?;
     let selection = reference.resolve(&app.session)?;
     app.execute("select.range", json!(selection))?;
-    app.canvas.scroll_to_caret = true;
-    app.canvas.mini_dismissed = Some(app.session.sel.clone());
+    app.canvas.reveal_selection_start(&app.session.sel);
     Ok(())
 }
 

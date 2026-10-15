@@ -88,8 +88,7 @@ pub(super) fn navigate(app: &mut WordApp, url: &str) -> Result<(), String> {
     let link = app.chatgpt.links.iter().find(|link| link.token == token).ok_or("This link does not belong to the current conversation")?;
     let selection = link.reference.resolve(&app.session)?;
     app.execute("select.range", json!(selection))?;
-    app.canvas.scroll_to_caret = true;
-    app.canvas.mini_dismissed = Some(app.session.sel.clone());
+    app.canvas.reveal_selection_start(&app.session.sel);
     Ok(())
 }
 
@@ -128,7 +127,7 @@ mod tests {
         app.execute("ui.chatgpt.showLink", json!({"url":link["url"]})).unwrap();
         assert_eq!(app.session.selected_text(), "world");
         assert_eq!(app.session.sel.anchor.off, 13);
-        assert!(app.canvas.scroll_to_caret);
+        assert_eq!(app.canvas.nav_to_pos, Some(app.session.sel.ordered().0));
         app.execute("text.insert", json!({"text":"changed"})).unwrap();
         assert!(app.execute("ui.chatgpt.showLink", json!({"url":link["url"]})).is_err());
     }
