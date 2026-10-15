@@ -1,6 +1,6 @@
 # WordCraft roadmap: milestones and what's next
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (native Windows EXE installer); previously minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously minor (Czech proofing review fixes; previously minor: Portuguese proofing; previously minor: Polish interface and Polish proofing; previously trivial: M7: formatting revisions landed, #41; previously trivial: M5: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: alpha gate checked: six core workflows pass; previously major: milestones moved here from ROADMAP.md; Current focus set from the re-measured gaps) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (Program Files install and DOCX default-app registration); previously minor (native Windows EXE installer); previously minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously minor (Czech proofing review fixes; previously minor: Portuguese proofing; previously minor: Polish interface and Polish proofing; previously trivial: M7: formatting revisions landed, #41; previously trivial: M5: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: alpha gate checked: six core workflows pass; previously major: milestones moved here from ROADMAP.md; Current focus set from the re-measured gaps) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 Forward-looking plan. The summary is [`ROADMAP.md`](../ROADMAP.md); the ranked work list is
 [`gaps.md`](gaps.md); the numbers are in [`target-app-parity.md`](target-app-parity.md). Hours are
@@ -74,16 +74,19 @@ languages, screen-reader access, ecosystem decisions (VBA, add-ins, cloud), an i
 
 ## Fork Windows installer
 
-[The EXE setup wizard](windows-installer.md) adds per-user installation with license acceptance,
-an installation-folder chooser, optional CLI tools, shortcuts and Open with registration.
+[The EXE setup wizard](windows-installer.md) installs for all users into Program Files with license acceptance,
+an installation-folder chooser, optional CLI tools, shortcuts and Open with/Default Apps registration. Setup requests
+administrator permission; the application keeps normal per-user permissions and credentials.
 It stages an explicit public payload and keeps the existing native ChatGPT profile and Windows
 permissions. Uninstall preserves documents and saved login. Signing remains a release-time
-configuration; local builds without a configured certificate are unsigned.
+configuration; local builds without a configured certificate are unsigned. Setup refuses to overwrite a
+different edition in the same directory.
 
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-15 | minor | Program Files default, all-users setup, DOCX Default Apps registration and foreign-install protection |
 | 2026-10-15 | minor | Native per-user Windows EXE installer, license/folder/components/shortcuts pages and uninstall preserving the user profile |
 | 2026-10-15 | minor | WordCraft-owned browser login, automatic credential storage and standalone documentation |
 | 2026-10-15 | minor | Default-on ChatGPT web search, referenced file reads and right-click Add to Chat |

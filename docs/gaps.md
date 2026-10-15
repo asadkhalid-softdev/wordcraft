@@ -1,6 +1,6 @@
 # Where WordCraft falls short of Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (native Windows EXE installer); previously minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously trivial (VML freeforms read and kept on save; previously trivial: consistent preferred cell widths; previously trivial: multi-paragraph field instructions no longer add blank lines; previously trivial: page-break-only list paragraphs hide their labels; previously trivial: floating-table overlap ignores empty line-break lines; previously trivial: copies keep their formatting on the clipboard as HTML, #1523; previously trivial: sample-text formulas on Enter, #1067; previously trivial: #29: copied equations as MathML, OMML open as #1297, #816; previously trivial: the Font list no longer keeps every previewed font in memory, #848; previously trivial: table column and row markers on the rulers, #700; previously trivial: table borders and the resize handle drag on the page, #217; previously trivial: formatting revisions landed, #41; previously trivial: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: first version; every known shortfall from the 2026-10-10 re-measure, ranked) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (Program Files install and DOCX default-app registration); previously minor (native Windows EXE installer); previously minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously trivial (VML freeforms read and kept on save; previously trivial: consistent preferred cell widths; previously trivial: multi-paragraph field instructions no longer add blank lines; previously trivial: page-break-only list paragraphs hide their labels; previously trivial: floating-table overlap ignores empty line-break lines; previously trivial: copies keep their formatting on the clipboard as HTML, #1523; previously trivial: sample-text formulas on Enter, #1067; previously trivial: #29: copied equations as MathML, OMML open as #1297, #816; previously trivial: the Font list no longer keeps every previewed font in memory, #848; previously trivial: table column and row markers on the rulers, #700; previously trivial: table borders and the resize handle drag on the page, #217; previously trivial: formatting revisions landed, #41; previously trivial: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: first version; every known shortfall from the 2026-10-10 re-measure, ranked) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 > **Printing update:** 2026-10-12 · direct desktop printing through craft-print; details below.
 
@@ -87,16 +87,19 @@ The same gaps grouped the way the parity documents are, for agents working in on
 
 ## Fork Windows installer
 
-[The EXE setup wizard](windows-installer.md) adds per-user installation with license acceptance,
-an installation-folder chooser, optional CLI tools, shortcuts and Open with registration.
+[The EXE setup wizard](windows-installer.md) installs for all users into Program Files with license acceptance,
+an installation-folder chooser, optional CLI tools, shortcuts and Open with/Default Apps registration. Setup requests
+administrator permission; the application keeps normal per-user permissions and credentials.
 It stages an explicit public payload and keeps the existing native ChatGPT profile and Windows
 permissions. Uninstall preserves documents and saved login. Signing remains a release-time
-configuration; local builds without a configured certificate are unsigned.
+configuration; local builds without a configured certificate are unsigned. Setup refuses to overwrite a
+different edition in the same directory.
 
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-15 | minor | Program Files default, all-users setup, DOCX Default Apps registration and foreign-install protection |
 | 2026-10-15 | minor | Native per-user Windows EXE installer, license/folder/components/shortcuts pages and uninstall preserving the user profile |
 | 2026-10-15 | minor | WordCraft-owned browser login, automatic credential storage and standalone documentation |
 | 2026-10-15 | minor | Default-on ChatGPT web search, referenced file reads and right-click Add to Chat |

@@ -6,13 +6,30 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)] [string] $Installer,
-    [string] $TestDirectory = [IO.Path]::GetTempPath()
+    [string] $TestDirectory = [IO.Path]::GetTempPath(),
+    [switch] $AllUsers
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
-$UninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{FE5755E2-9030-4A51-B3BA-68AC943313A8}_is1'
-if (Test-Path -LiteralPath $UninstallKey) { throw 'The fork is already installed for this user. Run this check in a clean Windows test account.' }
+$RegistryRoot = if ($AllUsers) { 'HKLM:' } else { 'HKCU:' }
+$UninstallSubkey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{FE5755E2-9030-4A51-B3BA-68AC943313A8}_is1'
+$UninstallKey = "$RegistryRoot\$UninstallSubkey"
+foreach ($scope in @('HKCU:', 'HKLM:')) {
+    if (Test-Path -LiteralPath "$scope\$UninstallSubkey") { throw 'The fork is already installed. Run this check in a clean Windows test account/machine.' }
+}
+if ($AllUsers) {
+    $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw '-AllUsers requires an elevated PowerShell in a clean test machine.' }
+}
+$CapabilitiesKey = "$RegistryRoot\Software\WordCraftChatGPT\Capabilities"
+$ProgidKey = "$RegistryRoot\Software\Classes\WordCraft.ChatGPT.Document"
+if ((Test-Path -LiteralPath $CapabilitiesKey) -or (Test-Path -LiteralPath $ProgidKey)) { throw 'Existing fork association keys found; refusing to modify them.' }
+# Observe Windows' existing choice without changing it or exposing it in test output.
+$choiceKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.docx\UserChoice'
+$choiceBefore = if (Test-Path -LiteralPath $choiceKey) { (Get-Item -LiteralPath $choiceKey).GetValue('ProgId') } else { $null }
+$extensionKey = "$RegistryRoot\Software\Classes\.docx"
+$defaultBefore = if (Test-Path -LiteralPath $extensionKey) { (Get-Item -LiteralPath $extensionKey).GetValue('') } else { $null }
 if (-not (Test-Path -LiteralPath "$Installer.payload.json")) { throw 'Installer payload inventory is missing' }
 $inventory = Get-Content -LiteralPath "$Installer.payload.json" -Raw | ConvertFrom-Json
 $checksum = ((Get-Content -LiteralPath "$Installer.sha256" -Raw) -split '\s+')[0]
@@ -30,10 +47,13 @@ $env:APPDATA = $ProfileDir
 $env:LOCALAPPDATA = $ProfileDir
 $env:WORDCRAFT_PROFILE_DIR = Join-Path $ProfileDir 'WordCraft'
 $installed = $false
-function Run-Setup([string] $Suffix) {
-    $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOICONS', '/SP-', "/DIR=`"$InstallDir`"", '/TYPE=full', '/TASKS=""', "/LOG=`"$TestRoot\setup-$Suffix.log`"")
+function Run-Setup([string] $Suffix, [string] $Destination = $InstallDir, [switch] $ExpectRefusal) {
+    $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOICONS', '/SP-', "/DIR=`"$Destination`"", '/TYPE=full', '/TASKS=fileassoc', "/LOG=`"$TestRoot\setup-$Suffix.log`"")
+    if (-not $AllUsers) { $arguments += '/CURRENTUSER' }
     $process = Start-Process -FilePath $Installer -ArgumentList $arguments -PassThru -Wait
-    if ($process.ExitCode -ne 0) { throw "Setup $Suffix failed: $($process.ExitCode)" }
+    if ($ExpectRefusal) {
+        if ($process.ExitCode -eq 0) { throw 'Setup overwrote an unowned WordCraft directory' }
+    } elseif ($process.ExitCode -ne 0) { throw "Setup $Suffix failed: $($process.ExitCode)" }
 }
 try {
     Run-Setup 'install'
@@ -53,6 +73,17 @@ try {
         & (Join-Path $InstallDir $tool[0]) $tool[1]
         if ($LASTEXITCODE -ne 0) { throw "Startup failed: $($tool[0])" }
     }
+    $registered = Get-Item -LiteralPath "$RegistryRoot\Software\RegisteredApplications"
+    if ($registered.GetValue('WordCraft with ChatGPT') -ne 'Software\WordCraftChatGPT\Capabilities') { throw 'Default Apps registration missing' }
+    if ((Get-Item -LiteralPath "$CapabilitiesKey\FileAssociations").GetValue('.docx') -ne 'WordCraft.ChatGPT.Document') { throw 'DOCX capability missing' }
+    $command = (Get-Item -LiteralPath "$ProgidKey\shell\open\command").GetValue('')
+    if ($command -ne "`"$InstallDir\wordcraft.exe`" `"%1`"") { throw 'DOCX open command is incorrect' }
+    if ((Get-Item -LiteralPath "$RegistryRoot\Software\Classes\.docx\OpenWithProgids").GetValue('WordCraft.ChatGPT.Document', $null) -ne '') { throw 'DOCX Open with entry missing' }
+    $unowned = Join-Path $TestRoot 'Other WordCraft installation'
+    New-Item -ItemType Directory -Force -Path $unowned | Out-Null
+    [IO.File]::WriteAllText("$unowned\wordcraft.exe", 'Synthetic upstream executable sentinel')
+    Run-Setup 'unowned-directory' $unowned -ExpectRefusal
+    if ([IO.File]::ReadAllText("$unowned\wordcraft.exe") -ne 'Synthetic upstream executable sentinel') { throw 'Another installation was modified' }
     $document = Join-Path $InstallDir 'synthetic-user-document.txt'
     [IO.File]::WriteAllText($document, 'Synthetic document must survive upgrade and uninstall.')
     Run-Setup 'upgrade'
@@ -62,7 +93,12 @@ try {
     $installed = $false
     if ((Test-Path -LiteralPath "$InstallDir\wordcraft.exe") -or (Test-Path -LiteralPath $UninstallKey)) { throw 'Uninstall left application files or registration' }
     if (-not (Test-Path -LiteralPath $sentinel) -or -not (Test-Path -LiteralPath $document)) { throw 'Uninstall removed user data' }
-    Write-Host 'PASS: custom path, installed hashes, clean payload, startup, upgrade and uninstall; user data preserved.'
+    if ((Test-Path -LiteralPath $CapabilitiesKey) -or (Test-Path -LiteralPath $ProgidKey)) { throw 'Uninstall left fork capabilities or ProgID' }
+    if ((Get-Item -LiteralPath "$RegistryRoot\Software\Classes\.docx\OpenWithProgids").GetValue('WordCraft.ChatGPT.Document', $null) -ne $null) { throw 'Uninstall left DOCX association' }
+    $choiceAfter = if (Test-Path -LiteralPath $choiceKey) { (Get-Item -LiteralPath $choiceKey).GetValue('ProgId') } else { $null }
+    $defaultAfter = if (Test-Path -LiteralPath $extensionKey) { (Get-Item -LiteralPath $extensionKey).GetValue('') } else { $null }
+    if ($choiceBefore -ne $choiceAfter -or $defaultBefore -ne $defaultAfter) { throw 'Setup changed an existing DOCX default' }
+    Write-Host 'PASS: custom path, payload hashes, startup, default-app registration, no DOCX default takeover, foreign-install guard, reinstall and uninstall; profile/document preserved.'
 } finally {
     # Do not remove the test directory if an installed package still references it.
     # A failure keeps logs for diagnosis; never touch another installation or real profile.

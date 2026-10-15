@@ -151,11 +151,11 @@ WordCraft with ChatGPT
 
 Write and edit documents with the native WordCraft editor and an optional ChatGPT sidebar.
 
-Setup installs for your Windows account. Choose an installation folder on any writable drive. Rust, Cargo and a separate ChatGPT integration are not required to run the installed app.
+Setup installs for all Windows users and requests administrator permission. The default folder is C:\Program Files\WordCraft; you can choose another drive. Rust, Cargo and a separate ChatGPT integration are not required to run the installed app.
 
 ChatGPT is optional. After installation, open ChatGPT in WordCraft and choose Continue with ChatGPT to sign in with your own account. Internet access and an eligible account/model are required. Your requests and any document/file context you provide are sent to OpenAI when using this feature. Web search is enabled by default and can be disabled in ChatGPT settings.
 
-No authentication JSON, tokens, chat history or personal documents are included in this installer. Login data is stored privately in your WordCraft user profile, separately from the installation folder. The application runs with your normal Windows permissions.
+No authentication JSON, tokens, chat history or personal documents are included in this installer. Login data is stored privately in your WordCraft user profile, separately from the installation folder. When started normally from its shortcut, the application runs with your normal Windows permissions. ChatGPT login belongs to each user individually.
 
 Uninstalling preserves your documents, settings and saved login. To remove ChatGPT credentials, choose Sign out in WordCraft before uninstalling.
 '@

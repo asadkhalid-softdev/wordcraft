@@ -1,6 +1,6 @@
 # WordCraft architecture
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (native Windows EXE installer); previously minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (Desktop ChatGPT transport and UI-thread document tools); previously minor (`proof` is per language: English and Polish; previously major: first committed version; `plan/architecture.md` is local-only) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (Program Files install and DOCX default-app registration); previously minor (native Windows EXE installer); previously minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (Desktop ChatGPT transport and UI-thread document tools); previously minor (`proof` is per language: English and Polish; previously major: first committed version; `plan/architecture.md` is local-only) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 How WordCraft is built today (origin/main `40c5d51`). The longer design notes in
 `plan/architecture.md` are gitignored and local to the original author's machine; this file is the
@@ -70,11 +70,13 @@ The selection context menu reuses `ui.chatgpt.attachSelection` through **Add to 
 
 ## Fork Windows installer
 
-[The EXE setup wizard](windows-installer.md) adds per-user installation with license acceptance,
-an installation-folder chooser, optional CLI tools, shortcuts and Open with registration.
+[The EXE setup wizard](windows-installer.md) installs for all users into Program Files with license acceptance,
+an installation-folder chooser, optional CLI tools, shortcuts and Open with/Default Apps registration. Setup requests
+administrator permission; the application keeps normal per-user permissions and credentials.
 It stages an explicit public payload and keeps the existing native ChatGPT profile and Windows
 permissions. Uninstall preserves documents and saved login. Signing remains a release-time
-configuration; local builds without a configured certificate are unsigned.
+configuration; local builds without a configured certificate are unsigned. Setup refuses to overwrite a
+different edition in the same directory.
 
 ## Testing and gates
 
@@ -92,6 +94,7 @@ configuration; local builds without a configured certificate are unsigned.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-15 | minor | Program Files default, all-users setup, DOCX Default Apps registration and foreign-install protection |
 | 2026-10-15 | minor | Native per-user Windows EXE installer, license/folder/components/shortcuts pages and uninstall preserving the user profile |
 | 2026-10-15 | minor | WordCraft-owned browser login, automatic credential storage and standalone documentation |
 | 2026-10-15 | minor | Default-on ChatGPT web search, referenced file reads and right-click Add to Chat |

@@ -10,22 +10,40 @@ The wizard includes:
 
 1. Welcome and a short explanation of the optional ChatGPT connection.
 2. The original MIT and Apache-2.0 licenses; choose either license as permitted by the project.
-3. An installation folder chooser. The default is `%LOCALAPPDATA%\Programs\WordCraft ChatGPT`;
+3. An installation folder chooser. The default is `C:\Program Files\WordCraft` (the system Program Files folder);
    a writable folder on another drive is supported.
 4. Standard, application-only or custom components. Command-line tools and the standalone
    ChatGPT sign-in helper are optional; browser login is built into the main application.
 5. Start Menu folder selection, an optional desktop shortcut, and optional document **Open with**
-   entries. Existing default applications are preserved.
-6. A review page, installation progress, and a finish page offering to launch WordCraft.
+   and Windows Default Apps registration, enabled initially. Existing default applications are preserved.
+6. A review page, installation progress, and a finish page offering to launch WordCraft or
+   open Windows Default Apps settings.
 
-Windows 10 or newer is required. This is a per-user desktop installation, without an admin prompt,
-AppContainer sandbox, background service, or Rust prerequisite. The application runs under the
-signed-in Windows user's ordinary permissions. Locations requiring administrator access are not
-appropriate for this per-user installer.
+Windows 10 or newer is required. Setup installs for all users and requests administrator
+permission to write to Program Files and register the application. The application itself runs
+with the signed-in user's ordinary permissions; there is no AppContainer sandbox, background
+service, or Rust prerequisite. Launch setup normally and approve the Windows UAC prompt, then
+open WordCraft from its shortcut. ChatGPT sign-in and credentials remain separate for each user.
 
-The fork has its own installer identity and folder, so it does not upgrade or remove the upstream
-MSI. Both editions use WordCraft's existing user profile; avoid running both against the same
-settings simultaneously. To replace an upstream installation, uninstall it separately.
+An upgrade of an existing all-users fork installation reuses its chosen directory. If you
+installed the earlier per-user version under AppData, uninstall that version before installing
+this one; uninstall preserves your user profile and documents. The fork retains a distinct
+installer identity from upstream's MSI, but the default Program Files directory can coincide
+with upstream's directory. Setup refuses to overwrite another edition's `wordcraft.exe`.
+Uninstall the upstream edition first or choose a different folder. Both editions use WordCraft's
+existing profile; avoid running both against the same settings simultaneously.
+
+## Make WordCraft the default for DOCX
+
+Leave **Register WordCraft for Open with and Default apps** selected during setup. Then either
+select **Choose default apps for documents** on the finish page or open **Windows Settings →
+Apps → Default apps**, search for `.docx`, and select **WordCraft with ChatGPT**.
+You can also right-click a DOCX file, choose **Open with → Choose another app**, select WordCraft,
+and choose the option to always use it. Windows labels vary between versions.
+
+Setup registers supported document types without changing your existing defaults. Windows
+requires you to choose the default through its own interface. The fork's registration is
+separate from the upstream MSI and is removed on uninstall.
 
 ## ChatGPT and private data
 
@@ -82,6 +100,10 @@ License texts are taken directly from the repository and locked dependency sourc
 artwork is drawn in code using the existing original WordCraft icon. No Office artwork is used.
 
 Use `-Arch arm64` with the Rust ARM64 MSVC target and corresponding Microsoft ARM64 build tools.
+Set `$env:WORDCRAFT_VERSION` to give an installer a fork/revision version (for example
+`0.7.0-fork.2`); this changes the setup version and filename, while the packaged application
+retains its Cargo version.
+
 `-SkipBuild` packages already-built release binaries from the normal Cargo target directory;
 those binaries must have been built with `RUSTFLAGS='-C target-feature=+crt-static'`.
 Do not enable `CRAFT_FONTS_DIR` only for packaging: use the same value at build and packaging time
@@ -103,8 +125,14 @@ Add `-TestDirectory D:\InstallerTests` to verify installation on another writabl
 The smoke check uses a unique temporary folder, an isolated synthetic profile and no shortcuts.
 It verifies a custom installation path, payload hashes, command-line startup, same-version
 reinstallation and uninstall, including preservation of a synthetic profile and an untracked
-user document. It refuses to run when this fork is already installed for the current user, to
-avoid modifying a real installation. It does not sign in or use real account credentials.
+user document. It refuses to run when this fork is already installed for any tested scope, to
+avoid modifying a real installation. It also checks DOCX/Default Apps registration, preserves
+the current default choice, and verifies that an unowned WordCraft directory cannot be overwritten. It does not sign in or use real account credentials.
+
+By default the test passes `/CURRENTUSER` and a custom writable directory, exercising the same
+installer without requesting elevation. To verify the normal all-users scope, run the test with
+`-AllUsers` from an elevated PowerShell in a clean Windows test machine. This checks machine
+registration; the interactive default remains Program Files and administrator approval.
 
 For interactive review, launch setup normally and inspect each page. A silent deployment is
 also available:

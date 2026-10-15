@@ -48,7 +48,10 @@ README continues below; an unchanged copy is also kept in [README_original.md](R
 
 This fork includes a native `.exe` setup wizard with license acceptance, installation-folder
 selection (including other drives), optional command-line tools, shortcuts and an uninstaller.
-It packages the application and public license/docs files only; each user signs in to their own
+Setup defaults to `C:\Program Files\WordCraft` and requests administrator permission.
+Leave document registration selected to make WordCraft available in Windows Default apps;
+choose `.docx` there to make it your default. The application and ChatGPT run with your normal
+user permissions. It packages the application and public license/docs files only; each user signs in to their own
 ChatGPT account after installing. Rust is needed only to build, not to install or run it.
 
 To build from native Windows PowerShell, install [Inno Setup](https://jrsoftware.org/isdl.php), then run:
