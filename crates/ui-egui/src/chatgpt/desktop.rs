@@ -1,191 +1,222 @@
-//! Stdio transport for the official Codex app-server. No network or credentials in the UI.
-
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Command, Stdio};
-use std::sync::mpsc::{self, Receiver, SyncSender};
+//! Background direct Responses transport, using the reference integration's OAuth JSON.
+//! The small internal event protocol keeps document actions on the UI thread.
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+    mpsc::{self, Receiver, SyncSender},
+};
 use std::time::Duration;
 
-use serde_json::Value;
-
-const MAX_LINE: usize = 2 * 1024 * 1024;
+use super::{auth, inference};
+use serde_json::{Value, json};
 
 pub(super) struct Client {
     outgoing: SyncSender<Value>,
     pub incoming: Receiver<Result<Value, String>>,
-    stop: mpsc::Sender<()>,
+    cancelled: Arc<AtomicBool>,
 }
-
 impl Drop for Client {
     fn drop(&mut self) {
-        let _ = self.stop.send(());
+        self.cancelled.store(true, Ordering::Relaxed);
     }
 }
-
 impl Client {
     #[cfg(test)]
     pub(super) fn test_pair() -> (Self, Receiver<Value>) {
         let (outgoing, writes) = mpsc::sync_channel(32);
         let (_events, incoming) = mpsc::sync_channel(64);
-        let (stop, _stopped) = mpsc::channel();
-        (Self { outgoing, incoming, stop }, writes)
+        (Self { outgoing, incoming, cancelled: Arc::new(AtomicBool::new(false)) }, writes)
     }
-
-    pub fn start(executable: &str, ctx: egui::Context) -> Result<Self, String> {
-        let executable = executable.to_owned();
-        let (outgoing, writes) = mpsc::sync_channel::<Value>(32);
+    pub fn start(model: &str, ctx: egui::Context) -> Result<Self, String> {
+        let model = model.to_owned();
+        let (outgoing, writes) = mpsc::sync_channel(32);
         let (events, incoming) = mpsc::sync_channel(64);
-        let (stop, stopped) = mpsc::channel();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let stopped = cancelled.clone();
         std::thread::Builder::new()
             .name("wordcraft-chatgpt".into())
             .spawn(move || {
-                let report = |error: String| {
-                    let _ = events.send(Err(error));
-                    ctx.request_repaint();
-                };
-                let result = supervise(&executable, &ctx, &events, writes, stopped);
-                if let Err(error) = result {
-                    report(error);
-                }
+                let worker = Worker { http: auth::http(), events, writes, ctx, stopped, model, tools: json!([]), history: Vec::new(), serial: 0 };
+                worker.run();
             })
-            .map_err(|e| format!("Couldn't start ChatGPT worker: {e}"))?;
-        Ok(Self { outgoing, incoming, stop })
+            .map_err(|_| "Could not start the ChatGPT connection")?;
+        Ok(Self { outgoing, incoming, cancelled })
     }
-
     pub fn send(&self, value: Value) -> Result<(), String> {
         self.outgoing.try_send(value).map_err(|_| "ChatGPT connection is unavailable or busy. Reconnect and try again.".into())
     }
+    pub fn stop(&self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
 }
-
-fn supervise(
-    executable: &str,
-    ctx: &egui::Context,
-    events: &SyncSender<Result<Value, String>>,
+struct Worker {
+    http: Result<reqwest::blocking::Client, String>,
+    events: SyncSender<Result<Value, String>>,
     writes: Receiver<Value>,
-    stopped: Receiver<()>,
-) -> Result<(), String> {
-    let home = wordcraft_control_key::settings_dir().ok_or("Couldn't locate WordCraft's settings folder")?.join("chatgpt");
-    std::fs::create_dir_all(&home).map_err(|e| format!("Couldn't create ChatGPT settings: {e}"))?;
-    let mut command = Command::new(executable);
-    command
-        .args([
-            "-c",
-            "forced_login_method=\"chatgpt\"",
-            "-c",
-            "features.shell_tool=false",
-            "-c",
-            "features.multi_agent=false",
-            "-c",
-            "features.apps=false",
-            "-c",
-            "web_search=\"disabled\"",
-            "app-server",
-        ])
-        .env("CODEX_HOME", &home)
-        .env_remove("OPENAI_API_KEY")
-        .env_remove("CODEX_API_KEY")
-        .env_remove("CODEX_ACCESS_TOKEN")
-        .current_dir(&home)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    // Launch the native executable directly. No console flash and no shell interpolation.
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
+    ctx: egui::Context,
+    stopped: Arc<AtomicBool>,
+    model: String,
+    tools: Value,
+    history: Vec<Value>,
+    serial: u64,
+}
+impl Worker {
+    fn emit(&self, value: Value) -> Result<(), String> {
+        if self.stopped.load(Ordering::Relaxed) {
+            return Err("Reply stopped".into());
+        }
+        self.events.send(Ok(value)).map_err(|_| "ChatGPT sidebar disconnected")?;
+        self.ctx.request_repaint();
+        Ok(())
     }
-    let mut child = command
-        .spawn()
-        .map_err(|e| format!("Couldn't start Codex ({e}). Install the native Codex CLI, or choose its executable in Chat settings."))?;
-    let result = (|| {
-        let mut stdin = child.stdin.take().ok_or("Codex did not provide stdin")?;
-        let stdout = child.stdout.take().ok_or("Codex did not provide stdout")?;
-        let reader_events = events.clone();
-        let wake = ctx.clone();
-        std::thread::Builder::new()
-            .name("chatgpt-read".into())
-            .spawn(move || {
-                let mut reader = BufReader::new(stdout);
-                loop {
-                    let value = read_message(&mut reader);
-                    let end = value.is_err();
-                    if reader_events.send(value).is_err() {
-                        break;
-                    }
-                    wake.request_repaint();
-                    if end {
-                        break;
-                    }
-                }
-            })
-            .map_err(|e| format!("Couldn't start ChatGPT reader: {e}"))?;
-        let writer_events = events.clone();
-        let wake = ctx.clone();
-        std::thread::Builder::new()
-            .name("chatgpt-write".into())
-            .spawn(move || {
-                while let Ok(value) = writes.recv() {
-                    let result = serde_json::to_writer(&mut stdin, &value)
-                        .map_err(std::io::Error::other)
-                        .and_then(|_| stdin.write_all(b"\n"))
-                        .and_then(|_| stdin.flush());
-                    if result.is_err() {
-                        let _ = writer_events.send(Err("ChatGPT connection closed while sending a request".into()));
-                        wake.request_repaint();
-                        break;
-                    }
-                }
-            })
-            .map_err(|e| format!("Couldn't start ChatGPT writer: {e}"))?;
+    fn notice(&self, method: &str, params: Value) -> Result<(), String> {
+        self.emit(json!({"method": method, "params": params}))
+    }
+    fn recv(&self) -> Result<Value, String> {
         loop {
-            match stopped.recv_timeout(Duration::from_millis(50)) {
-                Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => return Ok(()),
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err("Reply stopped".into());
+            }
+            match self.writes.recv_timeout(Duration::from_millis(50)) {
+                Ok(v) => return Ok(v),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
-            }
-            if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-                return Err(format!("Codex exited ({status}). Check the executable and reconnect."));
+                Err(_) => return Err("ChatGPT sidebar disconnected".into()),
             }
         }
-    })();
-    let _ = child.kill();
-    let _ = child.wait();
-    result
-}
-
-/// Bound allocation before parsing, including a peer that never sends a newline.
-fn read_message(reader: &mut impl BufRead) -> Result<Value, String> {
-    let mut bytes = Vec::new();
-    loop {
-        let chunk = reader.fill_buf().map_err(|e| format!("Couldn't read from Codex: {e}"))?;
-        if chunk.is_empty() {
-            return Err("ChatGPT connection closed".into());
-        }
-        let end = chunk.iter().position(|b| *b == b'\n').map(|n| n + 1);
-        let count = end.unwrap_or(chunk.len());
-        if count > MAX_LINE.saturating_sub(bytes.len()) {
-            return Err("Codex response exceeded the message size limit".into());
-        }
-        if let Some(part) = chunk.get(..count) {
-            bytes.extend_from_slice(part);
-        }
-        reader.consume(count);
-        if end.is_some() {
-            break;
+    }
+    fn run(mut self) {
+        while let Ok(value) = self.recv() {
+            if value.get("method").is_none() {
+                continue;
+            }
+            let id = value.get("id").cloned();
+            let result = self.handle(&value);
+            if let Some(id) = id.filter(|_| result.is_err() || v_method(&value) != "turn/start") {
+                let response = match result {
+                    Ok(result) => json!({"id": id, "result": result}),
+                    Err(error) => json!({"id": id, "error": {"message": error}}),
+                };
+                if self.emit(response).is_err() {
+                    break;
+                }
+            }
         }
     }
-    serde_json::from_slice(&bytes).map_err(|_| "Codex returned an invalid protocol message; update the Codex CLI".into())
+    fn choose_model(&mut self, account: &mut Value) {
+        let models = account.get("models").and_then(Value::as_array);
+        if !models.is_some_and(|models| models.iter().any(|m| m.get("slug").and_then(Value::as_str) == Some(self.model.as_str()))) {
+            self.model = models.and_then(|m| m.first()).and_then(|m| m.get("slug")).and_then(Value::as_str).unwrap_or("").into();
+        }
+        account["model"] = json!(self.model);
+    }
+    fn handle(&mut self, v: &Value) -> Result<Value, String> {
+        let http = self.http.as_ref().map_err(Clone::clone)?.clone();
+        let p = v.get("params").cloned().unwrap_or(json!({}));
+        match v.get("method").and_then(Value::as_str).unwrap_or("") {
+            "initialize" | "initialized" => Ok(json!({})),
+            "account/read" => {
+                let mut account = auth::account(&http)?;
+                self.choose_model(&mut account);
+                Ok(account)
+            }
+            "account/import" => {
+                let mut raw = zeroize::Zeroizing::new(p.get("json").and_then(Value::as_str).ok_or("Missing credential JSON")?.to_owned());
+                let result = auth::import(&http, &raw);
+                use zeroize::Zeroize;
+                raw.zeroize();
+                let mut account = result?;
+                self.choose_model(&mut account);
+                Ok(account)
+            }
+            "account/logout" => auth::logout(&http),
+            "thread/start" => {
+                self.history.clear();
+                self.tools = inference::tools(p.get("dynamicTools").unwrap_or(&json!([])))?;
+                Ok(json!({"thread": {"id": "document-chat"}}))
+            }
+            "turn/start" => {
+                let prompt = p.pointer("/input/0/text").and_then(Value::as_str).ok_or("Missing chat prompt")?;
+                self.serial = self.serial.checked_add(1).ok_or("Reconnect to start a new chat")?;
+                let turn = format!("turn-{}", self.serial);
+                self.emit(json!({"id": v.get("id"), "result": {"turn": {"id": turn}}}))?;
+                // Announce ownership before any queued tool request can reach the UI.
+                self.notice("turn/started", json!({"threadId": "document-chat", "turn": {"id": turn}}))?;
+                self.history.push(json!({"role": "user", "content": prompt}));
+                let result = self.turn(&http, &turn).map_err(|error| {
+                    self.history.clear();
+                    format!("{error} Conversation context was cleared; the next message starts a new conversation.")
+                });
+                self.notice(
+                    "turn/completed",
+                    json!({"threadId": "document-chat", "turn": {"id": turn, "error": result.err().map(|message| json!({"message": message}))}}),
+                )?;
+                Ok(json!({"turn": {"id": turn}}))
+            }
+            _ => Err("Unsupported ChatGPT operation".into()),
+        }
+    }
+    fn turn(&mut self, http: &reqwest::blocking::Client, turn: &str) -> Result<(), String> {
+        let mut calls = 0usize;
+        for round in 0..16 {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err("Reply stopped".into());
+            }
+            let token = auth::access(http)?.ok_or("Import ChatGPT credentials in ChatGPT settings first")?;
+            let output = inference::response(http, &token, &self.model, &self.history, &self.tools, &self.stopped, |event| {
+                if event.get("type").and_then(Value::as_str) == Some("response.output_text.delta") {
+                    self.notice(
+                        "item/agentMessage/delta",
+                        json!({"threadId": "document-chat", "itemId": format!("{turn}-{round}"), "delta": event.get("delta")}),
+                    )?;
+                }
+                Ok(())
+            })?;
+            let mut text = String::new();
+            for item in &output {
+                if item.get("type").and_then(Value::as_str) == Some("message") {
+                    for part in item.get("content").and_then(Value::as_array).into_iter().flatten() {
+                        if part.get("type").and_then(Value::as_str) == Some("output_text") {
+                            super::append_bounded(&mut text, part.get("text").and_then(Value::as_str).unwrap_or(""), super::MAX_TEXT);
+                        }
+                    }
+                }
+            }
+            if !text.is_empty() {
+                self.notice(
+                    "item/completed",
+                    json!({"threadId": "document-chat", "item": {"type": "agentMessage", "id": format!("{turn}-{round}"), "text": text}}),
+                )?;
+            }
+            let function_calls: Vec<_> =
+                output.iter().filter(|item| item.get("type").and_then(Value::as_str) == Some("function_call")).cloned().collect();
+            self.history.extend(output);
+            if function_calls.is_empty() {
+                return Ok(());
+            }
+            for call in function_calls {
+                calls = calls.saturating_add(1);
+                if calls > 32 {
+                    return Err("This reply reached its document-action limit. Review the document before continuing.".into());
+                }
+                let name = call.get("name").and_then(Value::as_str).ok_or("Invalid document tool name")?;
+                let call_id = call.get("call_id").and_then(Value::as_str).ok_or("Invalid document tool call")?;
+                let args: Value = serde_json::from_str(call.get("arguments").and_then(Value::as_str).ok_or("Invalid document tool arguments")?)
+                    .map_err(|_| "Invalid document tool arguments")?;
+                let id = format!("{turn}-{round}-{calls}");
+                self.emit(json!({"id": id, "method": "item/tool/call", "params": {
+                    "threadId": "document-chat", "turnId": turn, "tool": name, "arguments": args
+                }}))?;
+                let result = self.recv()?;
+                if result.get("id").and_then(Value::as_str) != Some(id.as_str()) || result.get("result").is_none() {
+                    return Err("Document tool connection was interrupted".into());
+                }
+                self.history.push(json!({"type": "function_call_output", "call_id": call_id, "output": result.get("result").map(Value::to_string).unwrap_or_default()}));
+            }
+        }
+        Err("This reply reached its action-round limit. Review the document before continuing.".into())
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn protocol_reader_bounds_unterminated_messages_and_rejects_bad_json() {
-        assert!(read_message(&mut &b"{\"id\":1}\n"[..]).is_ok());
-        assert!(read_message(&mut &b"bad json\n"[..]).is_err());
-        assert!(read_message(&mut &b"\xff\n"[..]).is_err());
-        assert!(read_message(&mut &b""[..]).is_err());
-        assert!(read_message(&mut vec![b'x'; MAX_LINE + 1].as_slice()).is_err());
-    }
+fn v_method(v: &Value) -> &str {
+    v.get("method").and_then(Value::as_str).unwrap_or("")
 }

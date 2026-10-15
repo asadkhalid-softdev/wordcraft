@@ -2702,3 +2702,23 @@ template	Letter	Thư
 	Cmd+Enter to send	Cmd+Enter để gửi
 	Ctrl+Enter to send	Ctrl+Enter để gửi
 	You	Bạn
+
+# ChatGPT credential settings; technical helper instructions retain English pending review.
+	ChatGPT settings	Cài đặt ChatGPT
+	Import authentication JSON	Nhập JSON xác thực
+	Use the ChatGPT Assist login helper on the computer running your browser. Requires uv.	Use the ChatGPT Assist login helper on the computer running your browser. Requires uv.
+	Download the login helper repository	Tải kho mã công cụ đăng nhập
+	Clone or download the entire repository. In its folder, run this in native PowerShell:	Clone or download the entire repository. In its folder, run this in native PowerShell:
+	Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal.	Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal.
+	Open the generated file:	Open the generated file:
+	Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant.	Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant.
+	Protected credential file JSON	JSON tệp thông tin đăng nhập được bảo vệ
+	Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart.	Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart.
+	Import and connect	Nhập và kết nối
+	Verifying credentials…	Đang xác minh thông tin đăng nhập…
+	After importing, clear your clipboard and close the credential editor. Never share the JSON or commit it to Git.	After importing, clear your clipboard and close the credential editor. Never share the JSON or commit it to Git.
+	ChatGPT model	Mô hình ChatGPT
+	Available models appear after importing credentials or connecting.	Available models appear after importing credentials or connecting.
+	ChatGPT Settings → Usage	ChatGPT Settings → Usage
+	uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"	uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"
+	notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"	notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"

@@ -1,4 +1,4 @@
-//! One document-scoped ChatGPT conversation, backed by Codex's managed ChatGPT login.
+//! One document-scoped ChatGPT conversation with imported, refreshable OSS OAuth credentials.
 //! Model tool calls run on the UI thread through the same command dispatcher as MCP.
 #![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
@@ -11,7 +11,11 @@ use serde_json::{Value, json};
 use crate::{WordApp, theme::Tokens};
 
 #[cfg(not(target_arch = "wasm32"))]
+mod auth;
+#[cfg(not(target_arch = "wasm32"))]
 mod desktop;
+#[cfg(not(target_arch = "wasm32"))]
+mod inference;
 
 const MAX_PROMPT: usize = 32_000;
 const MAX_TEXT: usize = 256_000;
@@ -39,11 +43,10 @@ struct Message {
 enum Request {
     Initialize,
     Account,
-    Login,
+    Import,
     Logout,
     Thread(String),
     Turn,
-    Interrupt,
 }
 
 struct Pending {
@@ -51,10 +54,15 @@ struct Pending {
     at: f64,
 }
 
-/// Transcripts and login URLs are deliberately separate from serialized UI preferences.
+/// Credentials and transcripts are deliberately separate from serialized UI preferences.
 #[derive(Default)]
 pub struct State {
     pub open: bool,
+    pub(crate) settings_open: bool,
+    auth_json: String,
+    importing: bool,
+    models: Vec<Value>,
+    model: String,
     draft: String,
     messages: Vec<Message>,
     account: Option<String>,
@@ -62,8 +70,6 @@ pub struct State {
     connecting: bool,
     busy: bool,
     stopping: bool,
-    login_url: Option<String>,
-    login_started: Option<f64>,
     active_at: Option<f64>,
     error: Option<String>,
     activity: String,
@@ -93,8 +99,7 @@ impl State {
         self.connecting = false;
         self.busy = false;
         self.stopping = false;
-        self.login_url = None;
-        self.login_started = None;
+        self.importing = false;
         self.active_at = None;
         self.pending.clear();
         self.next_id = 0;
@@ -140,10 +145,11 @@ impl State {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn connect(&mut self, ctx: &egui::Context, executable: &str) -> Result<(), String> {
+    fn connect(&mut self, ctx: &egui::Context, model: &str) -> Result<(), String> {
         self.disconnect();
         self.error = None;
-        self.client = Some(desktop::Client::start(executable.trim(), ctx.clone())?);
+        self.model = model.into();
+        self.client = Some(desktop::Client::start(model, ctx.clone())?);
         self.connecting = true;
         if !self.messages.is_empty() {
             self.push("ChatGPT", "Reconnected. A new conversation starts here; earlier messages are shown for reference.".into(), None);
@@ -160,7 +166,7 @@ impl State {
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn connect(&mut self, _ctx: &egui::Context, _executable: &str) -> Result<(), String> {
+    fn connect(&mut self, _ctx: &egui::Context, _model: &str) -> Result<(), String> {
         Err("ChatGPT integration is available in the WordCraft desktop app".into())
     }
 
@@ -223,17 +229,16 @@ impl State {
         result
     }
 
-    fn stop(&mut self, ctx: &egui::Context) -> Result<(), String> {
+    fn stop(&mut self, _ctx: &egui::Context) -> Result<(), String> {
         if !self.busy {
             return Ok(());
         }
-        self.stopping = true;
-        if let (Some(thread), Some(turn)) = (&self.thread, &self.turn) {
-            self.request(ctx, "turn/interrupt", json!({"threadId": thread, "turnId": turn}), Request::Interrupt)?;
-            self.activity = "Stopping…".into();
-        } else {
-            self.disconnect();
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(client) = &self.client {
+            client.stop();
         }
+        self.disconnect();
+        self.error = Some("Reply stopped. Earlier document actions remain; use Undo if needed. Reconnect to continue.".into());
         Ok(())
     }
 
@@ -243,7 +248,7 @@ impl State {
         if let Some(error) = value.get("error") {
             return Err(error.get("message").and_then(Value::as_str).unwrap_or("ChatGPT request failed").chars().take(2000).collect());
         }
-        let r = value.get("result").ok_or("Codex returned a response without a result")?;
+        let r = value.get("result").ok_or("ChatGPT returned a response without a result")?;
         match pending.request {
             Request::Initialize => {
                 self.send(json!({"method": "initialized"}))?;
@@ -252,49 +257,43 @@ impl State {
             Request::Account => {
                 self.ready = true;
                 self.connecting = false;
-                self.account = r
-                    .get("account")
-                    .filter(|a| a.get("type").and_then(Value::as_str) == Some("chatgpt"))
-                    .map(|a| a.get("email").and_then(Value::as_str).unwrap_or("ChatGPT account").chars().take(200).collect());
+                self.apply_account(r);
             }
-            Request::Login => {
-                let url =
-                    r.get("authUrl").and_then(Value::as_str).filter(|url| trusted_login_url(url)).ok_or("Codex returned an invalid sign-in URL")?;
-                self.login_url = Some(url.to_string());
-                self.login_started = Some(ctx.input(|i| i.time));
-                ctx.open_url(egui::OpenUrl::new_tab(url));
+            Request::Import => {
+                self.importing = false;
+                self.settings_open = false;
+                self.apply_account(r);
             }
             Request::Logout => {
                 self.clear();
+                if r.get("revoked").and_then(Value::as_bool) == Some(false) {
+                    self.error = Some("Signed out locally. Remote revocation was not confirmed; disconnect the app in ChatGPT Settings.".into());
+                }
             }
             Request::Thread(prompt) => {
-                let id = r.pointer("/thread/id").and_then(Value::as_str).ok_or("Codex did not return a conversation id")?;
+                let id = r.pointer("/thread/id").and_then(Value::as_str).ok_or("ChatGPT did not return a conversation id")?;
                 self.thread = Some(id.to_owned());
                 self.start_turn(ctx, prompt)?;
             }
             Request::Turn => {
                 self.turn = r.pointer("/turn/id").and_then(Value::as_str).map(str::to_owned);
             }
-            Request::Interrupt => {}
         }
         Ok(())
     }
 
+    fn apply_account(&mut self, r: &Value) {
+        self.ready = true;
+        self.connecting = false;
+        self.account = r
+            .get("account")
+            .filter(|a| a.get("type").and_then(Value::as_str) == Some("chatgpt"))
+            .map(|a| a.get("email").and_then(Value::as_str).unwrap_or("ChatGPT account").chars().take(200).collect());
+        self.models = r.get("models").and_then(Value::as_array).cloned().unwrap_or_default();
+        self.model = r.get("model").and_then(Value::as_str).unwrap_or("").into();
+    }
+
     fn notification(&mut self, ctx: &egui::Context, method: &str, p: &Value) -> Result<(), String> {
-        match method {
-            "account/login/completed" => {
-                self.login_url = None;
-                self.login_started = None;
-                if p.get("success").and_then(Value::as_bool) != Some(true) {
-                    return Err(p.get("error").and_then(Value::as_str).unwrap_or("ChatGPT sign-in failed").chars().take(2000).collect());
-                }
-                self.request(ctx, "account/read", json!({"refreshToken": false}), Request::Account)?;
-            }
-            "account/updated" if self.login_started.is_none() => {
-                self.request(ctx, "account/read", json!({"refreshToken": false}), Request::Account)?;
-            }
-            _ => {}
-        }
         if p.get("threadId").and_then(Value::as_str) != self.thread.as_deref() || self.thread.is_none() {
             return Ok(());
         }
@@ -340,11 +339,6 @@ impl State {
         }
         Ok(())
     }
-}
-
-fn trusted_login_url(url: &str) -> bool {
-    ["https://auth.openai.com/", "https://chatgpt.com/", "https://auth0.openai.com/"].iter().any(|prefix| url.starts_with(prefix))
-        && url.len() <= 16_000
 }
 
 fn append_bounded(target: &mut String, text: &str, cap: usize) {
@@ -489,14 +483,14 @@ pub fn poll(app: &mut WordApp, ctx: &egui::Context) {
             break;
         }
     }
+    if !app.chatgpt.model.is_empty() {
+        app.ui.chatgpt_model = app.chatgpt.model.clone();
+    }
     let now = ctx.input(|i| i.time);
-    if app.chatgpt.active_at.is_some_and(|at| now - at > 300.0)
-        || app.chatgpt.pending.values().any(|p| now - p.at > 90.0)
-        || app.chatgpt.login_started.is_some_and(|at| now - at > 300.0)
-    {
+    if app.chatgpt.active_at.is_some_and(|at| now - at > 300.0) || app.chatgpt.pending.values().any(|p| now - p.at > 90.0) {
         app.chatgpt.fail("ChatGPT took too long to respond. Reconnect and try again.".into());
     }
-    if app.chatgpt.busy || !app.chatgpt.pending.is_empty() || app.chatgpt.login_started.is_some() {
+    if app.chatgpt.busy || !app.chatgpt.pending.is_empty() {
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
     }
 }
@@ -569,7 +563,9 @@ pub fn commands(app: &WordApp) -> Vec<Value> {
     [
         ("toggle", "ChatGPT sidebar", r#"{"value"?: bool}"#),
         ("connect", "Connect to ChatGPT", "{}"),
-        ("login", "Sign in with ChatGPT", "{} (opens browser)"),
+        ("login", "ChatGPT settings", "{} (opens credential import settings)"),
+        ("settings", "ChatGPT settings", "{}"),
+        ("import", "Import ChatGPT credentials", "{} (uses the private settings field; no credentials in command params)"),
         ("logout", "Sign out of ChatGPT", "{}"),
         ("clear", "Clear conversation", "{} (also stops any active reply)"),
         ("stop", "Stop reply", "{}"),
@@ -598,17 +594,18 @@ pub fn command(app: &mut WordApp, id: &str, params: &Value) -> Option<Result<Val
                 Ok(())
             }
         }
-        "connect" => app.chatgpt.connect(&ctx, &app.ui.chatgpt_executable),
-        "login" if app.chatgpt.ready && app.chatgpt.login_started.is_none() => {
-            app.chatgpt.request(&ctx, "account/login/start", json!({"type": "chatgpt"}), Request::Login)
+        "connect" => app.chatgpt.connect(&ctx, &app.ui.chatgpt_model),
+        "login" | "settings" => {
+            app.chatgpt.settings_open = true;
+            Ok(())
         }
-        "login" => Err("Connect first, or finish the sign-in already in progress".into()),
+        "import" => import_credentials(app, &ctx),
         "logout" if app.chatgpt.ready && !app.chatgpt.busy => app.chatgpt.request(&ctx, "account/logout", json!({}), Request::Logout),
         "logout" => Err("Connect first and stop the current reply before signing out".into()),
         "clear" => {
             let reconnect = app.chatgpt.ready;
             app.chatgpt.clear();
-            if reconnect { app.chatgpt.connect(&ctx, &app.ui.chatgpt_executable) } else { Ok(()) }
+            if reconnect { app.chatgpt.connect(&ctx, &app.ui.chatgpt_model) } else { Ok(()) }
         }
         "stop" => app.chatgpt.stop(&ctx),
         "send" => app.chatgpt.submit(&ctx, params.get("text").and_then(Value::as_str).unwrap_or(""), app.session.document_id()),
@@ -618,6 +615,107 @@ pub fn command(app: &mut WordApp, id: &str, params: &Value) -> Option<Result<Val
     Some(result.map(|()| json!({"open": app.chatgpt.open, "ready": app.chatgpt.ready, "signedIn": app.chatgpt.account.is_some(), "busy": app.chatgpt.busy, "messages": app.chatgpt.messages.len()})))
 }
 
+fn clear_auth_input(state: &mut State) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use zeroize::Zeroize;
+        state.auth_json.zeroize();
+    }
+    state.auth_json.clear();
+}
+
+fn import_credentials(app: &mut WordApp, ctx: &egui::Context) -> Result<(), String> {
+    if app.chatgpt.busy || app.chatgpt.importing {
+        return Err("Stop the current reply before importing credentials".into());
+    }
+    if app.chatgpt.auth_json.len() > 64_000 {
+        clear_auth_input(&mut app.chatgpt);
+        return Err("Credential JSON is too large".into());
+    }
+    // Validate syntax locally without ever echoing the submitted JSON in errors.
+    if !serde_json::from_str::<Value>(&app.chatgpt.auth_json).is_ok_and(|v| v.is_object()) {
+        clear_auth_input(&mut app.chatgpt);
+        return Err("Paste the complete credential JSON from the login helper".into());
+    }
+    // Replacing an account always starts a new document conversation.
+    let mut raw = std::mem::take(&mut app.chatgpt.auth_json);
+    app.chatgpt.clear();
+    let result = app
+        .chatgpt
+        .connect(ctx, &app.ui.chatgpt_model)
+        .and_then(|()| app.chatgpt.request(ctx, "account/import", json!({"json": raw}), Request::Import));
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use zeroize::Zeroize;
+        raw.zeroize();
+    }
+    raw.clear();
+    app.chatgpt.importing = result.is_ok();
+    result
+}
+
+fn settings(app: &mut WordApp, ctx: &egui::Context) {
+    if !app.chatgpt.settings_open {
+        return;
+    }
+    let mut open = true;
+    egui::Window::new(crate::tl!("ChatGPT settings")).id(egui::Id::new("chatgpt_settings"))
+        .open(&mut open).default_width(560.0).resizable(false).collapsible(false).show(ctx, |ui| {
+            egui::ScrollArea::vertical().max_height(660.0).show(ui, |ui| {
+                ui.label(crate::tl!("Import authentication JSON"));
+                ui.label(crate::tl!("Use the ChatGPT Assist login helper on the computer running your browser. Requires uv."));
+                ui.hyperlink_to(crate::tl!("Download the login helper repository"), "https://github.com/asadkhalid-softdev/hass-chatgpt-integration");
+                ui.label(crate::tl!("Clone or download the entire repository. In its folder, run this in native PowerShell:"));
+                ui.add(egui::Label::new(crate::tl!(r#"uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json""#)).selectable(true).wrap());
+                ui.label(crate::tl!("Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal."));
+                ui.label(crate::tl!("Open the generated file:"));
+                ui.add(egui::Label::new(crate::tl!(r#"notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json""#)).selectable(true).wrap());
+                ui.label(crate::tl!("Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant."));
+                let label = ui.label(crate::tl!("Protected credential file JSON"));
+                ui.add(egui::TextEdit::singleline(&mut app.chatgpt.auth_json).password(true).char_limit(64_000).desired_width(f32::INFINITY))
+                    .labelled_by(label.id);
+                ui.small(crate::tl!("Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart."));
+                if let Some(error) = &app.chatgpt.error { ui.label(error); }
+                ui.horizontal(|ui| {
+                    if ui.add_enabled(!app.chatgpt.busy && !app.chatgpt.importing && !app.chatgpt.auth_json.trim().is_empty(), egui::Button::new(crate::tl!("Import and connect"))).clicked() {
+                        act(app, "import", json!({}));
+                    }
+                    if app.chatgpt.importing { ui.spinner(); ui.label(crate::tl!("Verifying credentials…")); }
+                    if ui.button(crate::tl!("Close" )).clicked() { app.chatgpt.settings_open = false; }
+                });
+                ui.small(crate::tl!("After importing, clear your clipboard and close the credential editor. Never share the JSON or commit it to Git."));
+                ui.separator();
+                ui.label(crate::tl!("ChatGPT model"));
+                if app.chatgpt.models.is_empty() {
+                    ui.small(crate::tl!("Available models appear after importing credentials or connecting."));
+                } else {
+                    let mut model = app.ui.chatgpt_model.clone();
+                    let selected = app.chatgpt.models.iter().find(|m| m.get("slug").and_then(Value::as_str) == Some(model.as_str()))
+                        .and_then(|m| m.get("display_name")).and_then(Value::as_str).unwrap_or(&model).to_owned();
+                    egui::ComboBox::from_id_salt("chatgpt_model").selected_text(selected).show_ui(ui, |ui| {
+                        for item in &app.chatgpt.models {
+                            if let Some(slug) = item.get("slug").and_then(Value::as_str) {
+                                ui.selectable_value(&mut model, slug.to_owned(), item.get("display_name").and_then(Value::as_str).unwrap_or(slug));
+                            }
+                        }
+                    });
+                    if model != app.ui.chatgpt_model && !app.chatgpt.busy {
+                        app.ui.chatgpt_model = model;
+                        app.chatgpt.clear();
+                        act(app, "connect", json!({}));
+                    }
+                }
+                ui.hyperlink_to(crate::tl!("ChatGPT Settings → Usage"), "https://chatgpt.com/settings/usage");
+            });
+        });
+    if !open {
+        app.chatgpt.settings_open = false;
+    }
+    if !app.chatgpt.settings_open {
+        clear_auth_input(&mut app.chatgpt);
+    }
+}
+
 fn act(app: &mut WordApp, action: &str, params: Value) {
     if let Err(error) = app.execute(&format!("ui.chatgpt.{action}"), params) {
         app.chatgpt.error = Some(error);
@@ -625,6 +723,7 @@ fn act(app: &mut WordApp, action: &str, params: Value) {
 }
 
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
+    settings(app, ui.ctx());
     if !app.chatgpt.open {
         return;
     }
@@ -661,9 +760,10 @@ fn panel(app: &mut WordApp, ui: &mut Ui) {
                     ui.close();
                 }
                 ui.separator();
-                ui.label(crate::tl!("Codex executable"));
-                ui.add(egui::TextEdit::singleline(&mut app.ui.chatgpt_executable).char_limit(4096).desired_width(240.0));
-                ui.small(crate::tl!("Use an executable path if Codex is not on PATH."));
+                if ui.button(crate::tl!("ChatGPT settings")).clicked() {
+                    act(app, "settings", json!({}));
+                    ui.close();
+                }
             });
         });
     });
@@ -692,18 +792,11 @@ fn panel(app: &mut WordApp, ui: &mut Ui) {
         } else if ui.button(crate::tl!("Connect to ChatGPT")).clicked() {
             act(app, "connect", json!({}));
         }
-        ui.small(crate::tl!("Requires the native Codex CLI. Sign-in opens your browser."));
-        ui.hyperlink_to(crate::tl!("Install Codex"), "https://developers.openai.com/codex/cli/");
-    } else if app.chatgpt.account.is_none() {
-        if let Some(url) = &app.chatgpt.login_url {
-            ui.label(crate::tl!("Finish signing in in your browser."));
-            ui.hyperlink_to(crate::tl!("Open sign-in page"), url);
-            if ui.button(crate::tl!("Cancel sign-in")).clicked() {
-                app.chatgpt.disconnect();
-            }
-        } else if ui.add_enabled(app.chatgpt.pending.is_empty(), egui::Button::new(crate::tl!("Sign in with ChatGPT"))).clicked() {
-            act(app, "login", json!({}));
+        if ui.button(crate::tl!("ChatGPT settings")).clicked() {
+            act(app, "settings", json!({}));
         }
+    } else if app.chatgpt.account.is_none() && ui.button(crate::tl!("Import authentication JSON")).clicked() {
+        act(app, "settings", json!({}));
     }
     ui.add_space(6.0);
     ui.label(RichText::new(crate::tl!("Chat can read and edit the loaded document. Use Undo to reverse edits.")).small().color(t.text_dim));

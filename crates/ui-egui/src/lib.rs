@@ -258,8 +258,8 @@ pub struct UiState {
     pub(crate) legacy_dark: Option<bool>,
     pub nav_tab: String,
     pub show_discord: bool,
-    /// Native Codex CLI executable used by the ChatGPT sidebar.
-    pub chatgpt_executable: String,
+    /// Selected account-specific ChatGPT model; credentials are stored separately.
+    pub chatgpt_model: String,
     /// User name (File › Options) for comments and tracked changes; empty keeps the default.
     pub author: String,
     /// Desktop: the main window's size and position, restored at the next launch.
@@ -355,7 +355,7 @@ impl Default for UiState {
             legacy_dark: None,
             nav_tab: "headings".into(),
             show_discord: true,
-            chatgpt_executable: "codex".into(),
+            chatgpt_model: String::new(),
             author: String::new(),
             window: None,
             language: i18n::AUTO.into(),
@@ -2390,6 +2390,8 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.chatgpt.toggle"
             | "ui.chatgpt.connect"
             | "ui.chatgpt.login"
+            | "ui.chatgpt.settings"
+            | "ui.chatgpt.import"
             | "ui.chatgpt.logout"
             | "ui.chatgpt.clear"
             | "ui.chatgpt.stop"

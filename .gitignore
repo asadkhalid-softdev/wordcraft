@@ -8,3 +8,12 @@ plan/
 /.claude/
 /target-*/
 /craft-fonts/
+
+# Local authentication material; never include in source control.
+.env
+.env.*
+!.env.example
+auth.json
+**/chatgpt-direct/
+chatgpt-account*.json
+wordcraft-account*.json

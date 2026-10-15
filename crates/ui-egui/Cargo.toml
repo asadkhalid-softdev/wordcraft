@@ -36,12 +36,18 @@ zbus = "=5.19.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wordcraft-control-key = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto"] }
+tempfile = "3"
+fs2 = "0.4"
+zeroize = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # The browser clock (`SystemTime::now()`/`Instant::now()` panic on wasm32).
 js-sys = "0.3"
 
 [dev-dependencies]
+rsa = { version = "0.9", features = ["getrandom"] }
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
 zip = { workspace = true }
 

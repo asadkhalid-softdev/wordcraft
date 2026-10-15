@@ -1,85 +1,119 @@
 # ChatGPT document assistant
 
-> **Last reviewed:** 2026-10-15 · **Last updated:** 2026-10-15 · **Change:** minor (first implementation)
+Last updated: 2026-10-15 · M0 extension: imported OSS OAuth authentication.
 
-Click **ChatGPT** in the desktop title bar to open the resizable right sidebar. The close button
-collapses it without ending the conversation. ChatGPT can read the current document and use every
-registered engine command to edit it, including text, formatting, styles, tables, sections,
-headers, footers, drawings, references and review features. Edits use normal **Undo**.
+Open **ChatGPT** in the title bar, then **⋯ → ChatGPT settings**. Paste the complete protected
+credential JSON from the ChatGPT Assist login helper into **Protected credential file JSON** and
+click **Import and connect**. Choose an account model in the same settings popup.
 
-## Setup on native Windows
+WordCraft connects directly to OpenAI with the imported ChatGPT grant. The native Codex CLI and an
+API key are no longer required. Access depends on your account/workspace's eligible ChatGPT plan
+permissions and usage limits. This imports an OSS OAuth grant, not a ChatGPT browser session or
+Codex `auth.json`.
 
-Install the native [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) using its official installer
-from PowerShell:
+## Acquire the JSON on native Windows
 
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
-```
+These instructions follow the reference [ChatGPT Assist installation guide](https://github.com/asadkhalid-softdev/hass-chatgpt-integration/blob/main/docs/INSTALLATION.md).
+Its login helper performs OAuth, validates the returned identity and creates the protected JSON.
+Use the full helper repository, including `scripts/` and `custom_components/`; the helper shares
+its OAuth code with the integration. Home Assistant itself is not required.
 
-Reopen PowerShell, verify `codex --version`, then start WordCraft:
+1. Install `uv` on the computer running your browser, then clone or download
+   [hass-chatgpt-integration](https://github.com/asadkhalid-softdev/hass-chatgpt-integration).
+2. Open native PowerShell in that repository's directory. Run this single line:
 
-```powershell
-cd 'X:\My Data\Projects\reverse-engineered\wordcraft'
-cargo run --release -p wordcraft -- --sample
-```
+   ```powershell
+   uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"
+   ```
 
-Click **ChatGPT → Connect to ChatGPT → Sign in with ChatGPT**. Finish the sign-in in your browser,
-then return to WordCraft. No API key is required. Account eligibility, available models and usage
-limits are managed by OpenAI. This is a local, open-source integration using the documented
-[Codex app-server](https://learn.chatgpt.com/docs/app-server) authentication and dynamic tools.
+   `uv` downloads Python and manages the helper's dependencies. Use a local NTFS user profile
+   folder on Windows so the helper can protect the output file.
+3. Complete OpenAI sign-in, choose your workspace if prompted, and grant ChatGPT plan access.
+   Wait for **Sign-in verified** in the terminal. The browser callback must reach
+   `http://127.0.0.1:<port>/auth/callback` on the same computer. The helper times out after five minutes.
+4. Open the generated file:
 
-If Codex is not on PATH, set the full native executable path in **Chat options (three dots) →
-Codex executable**, then reconnect. This setting is saved with your UI preferences. Use the
-standalone native executable, rather than an npm `.cmd` launcher. macOS and Linux use their native
-Codex CLI in the same way.
+   ```powershell
+   notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"
+   ```
 
-## Chat and document edits
+5. Copy its entire JSON into WordCraft's masked settings field and click **Import and connect**.
+   The access token must still be valid. If validation says it expired, run the helper again.
+6. Clear your clipboard and close the editor. Keep any retained file private; never put it in Git
+   or a support message. WordCraft clears the input after submission or closing settings.
 
-Send a message with **Send** or **Ctrl+Enter** (**Cmd+Enter** on macOS). Enter inserts a newline.
-Replies stream into the history. Tool status records commands as they complete. **Stop** interrupts
-the reply and refuses any later queued document calls from that turn; edits already applied remain
-available to Undo. The three-dot menu offers **Clear conversation**, **Sign out**, and **Disconnect**.
-Clearing stops the active turn, discards its model context and reconnects using the saved login.
+If the browser does not open, add `--no-browser` to the helper command, then open the printed URL
+in a browser on the same computer. The original helper guide also covers virtual environments
+and Linux/macOS setup.
 
-Examples: “Rewrite the selected paragraph more concisely”, “Make all headings consistent”, or
-“Insert a three-column comparison table after this paragraph”. The assistant discovers commands
-and exact parameters from WordCraft rather than maintaining a separate subset of editing features.
-Programmatic engine calls do not open formatting or file-picker dialogs; required parameters must
-be supplied in chat. Closing or replacing unsaved work is refused until it is saved, unless the
-user explicitly requests discarding changes and the assistant passes a boolean `force: true`. Unsupported features remain subject to the engine’s existing limits.
+**Create a separate registration for WordCraft.** The distinct `wordcraft-account.json` output
+avoids reusing Home Assistant's default file. If that output already belongs to another running
+integration, choose a new output filename. Do not import one renewable session into multiple
+applications: rotating refresh tokens would race. The shared helper currently labels the OAuth
+registration **ChatGPT Assist** on OpenAI's consent screen. After import, WordCraft owns refreshes.
+Reauthorizing an already-imported registration must use its latest rotated credentials, not a stale
+helper output; use a new output filename to create a fresh registration when necessary.
 
-## Storage and scope
+## Settings and persistence
 
-- There is one conversation for the loaded document. Collapsing the pane preserves it.
-- History is held in memory for this app session. Opening/replacing the document clears it.
-  Restarting or reconnecting the backend starts fresh model context. After reconnecting, older
-  visible messages are retained only for reference and a notice marks the new conversation.
-- The app sends document content to OpenAI when the assistant inspects it during a conversation.
-  Merely opening the sidebar does not send the document.
-- Codex manages and refreshes login credentials using an isolated `CODEX_HOME`: the `chatgpt`
-  subfolder of WordCraft’s settings directory (`%APPDATA%\WordCraft\chatgpt` on Windows).
-  Signing out here does not sign out your separate Codex coding sessions. Credentials, login URLs
-  and transcript text are excluded from `ui.json` and are not written to WordCraft logs.
-- Shell tools, delegation, apps and web search are disabled. The backend uses a read-only filesystem
-  sandbox; document edits happen through WordCraft. Tool calls check document, conversation and
-  turn ownership immediately before dispatch. No server is exposed on the network by WordCraft.
-- Browser/WASM builds show a desktop-availability message and never launch a native process.
+- Login persists across application restarts. Click **Connect to ChatGPT** to reuse the saved grant.
+- Credentials are stored separately from preferences and documents at
+  `%APPDATA%\WordCraft\chatgpt-direct\account.json` on Windows,
+  `~/Library/Application Support/WordCraft/chatgpt-direct/account.json` on macOS, or
+  `$XDG_CONFIG_HOME/wordcraft/chatgpt-direct/account.json` (default `~/.config/wordcraft/…`) elsewhere.
+  `WORDCRAFT_PROFILE_DIR` overrides the WordCraft profile directory.
+- Writes are atomic. Credential files have a protected current-user Windows ACL or Unix mode 0600.
+  This is protected local plaintext storage, not an encrypted vault.
+- Import verifies the access-token signature against OpenAI signing keys, RS256, issuer, audience,
+  expiry, issue time, subject, issued client ID and required ChatGPT plan scopes. Imported email,
+  host attribution and expiry metadata are not trusted.
+- WordCraft discovers the signed-in account's model list. Your chosen model is a nonsecret preference.
+- Refreshes use the issued client ID and are serialized with a cross-process file lock. Replacement
+  refresh tokens are saved atomically. Do not share the session with another app.
+- **Sign out** attempts remote revocation and removes local credentials. If revocation cannot be
+  confirmed, WordCraft says so; disconnect the registration in ChatGPT Settings.
+- Credentials and transcripts are excluded from UI preferences, control status and diagnostics.
+  Provider error bodies are not shown or logged. Local credential filenames are ignored by Git.
 
-## Automation and verification
+## Conversation and document access
 
-The control channel exposes `ui.chatgpt.toggle {value?}`, `connect`, `login`, `logout`, `clear`,
-`stop`, `send {text}` and `status`; the latter commands take an empty object unless specified.
-`engine.commands {search: "chatgpt"}` lists them. Status exposes connection and message counts,
-without credentials or transcript text. `login` explicitly opens the sign-in browser page.
+One conversation belongs to the loaded document. Collapsing the sidebar keeps it; **⋯ → Clear
+conversation**, replacing the document, switching accounts/models or restarting the application
+starts a new one. History is currently in memory only. Failed turns discard the backend context.
+**Stop** cancels document actions immediately and disconnects the worker; reconnect to continue.
+An in-flight HTTPS request may finish in the background, but cannot dispatch more document actions.
+Earlier edits remain and can be reversed with normal Undo. Ctrl+Enter (Cmd+Enter on macOS) sends;
+ordinary Enter adds a newline.
 
-Run focused tests with `cargo test -p wordcraft-ui-egui chatgpt --lib`. They cover engine command
-discovery, edits and Undo, stale/stop/document guards, streaming, clear/collapse, text input focus,
-pagination, message limits and URL validation. A protocol smoke check with Codex 0.162.1 verifies
-initialization and ephemeral dynamic-tool thread creation without signing in or invoking a model.
-Browser sign-in, account limits and a live model edit still require an interactive account check.
+The assistant uses `wordcraft_commands` to discover every registered engine command and native
+printing command, `wordcraft_inspect` to inspect paginated document state, and `wordcraft_execute`
+to dispatch edits through WordCraft's normal command validation and Undo. Unsupported UI dialogs,
+shell execution and arbitrary external tools are excluded. Tool calls must still belong to the
+active document and turn, and cannot silently discard unsaved work.
+
+The direct backend calls the public `https://api.openai.com/v1/models` and `/responses` routes,
+with `store=false` and `stream=true`. Your questions and necessary document/tool context go to
+OpenAI. This does not provide access to your ChatGPT chat history or promise zero provider retention.
+Tools execute only after `response.completed`; partial, failed or interrupted streams never trigger
+provisional actions. Input, stream size, output item count and action rounds are bounded. Mutating
+requests are not automatically retried.
+
+Official protocol references: [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference),
+[accounts, refresh and revocation](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions).
+The browser-hosted WASM app displays an availability message; credential storage and HTTPS transport
+are compiled only for native desktop.
+
+## Validation
+
+Offline tests cover signed access-token validation, private atomic credential replacement, malformed
+imports, bounded SSE parsing, completed-response gating, document command discovery/editing/Undo,
+stale and stopped tool calls, and settings/credential isolation. Headless screenshots inspect the
+sidebar and settings popup. Live sign-in, account model discovery and a real inference turn still
+require an interactive account check. No real credential JSON is used in tests or committed.
 
 ## Revision history
 
-| Date | Change | Summary |
-|---|---|---|
-| 2026-10-15 | minor | First desktop ChatGPT sidebar, managed login and engine tools |
+| Date | Change |
+|---|---|
+| 2026-10-15 | Replace Codex login with reference-compatible OAuth JSON import, protected persistence, direct streaming inference and settings/model picker |
+| 2026-10-15 | Initial document sidebar and command tools |

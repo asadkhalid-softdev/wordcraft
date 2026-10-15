@@ -2652,3 +2652,23 @@ preview	Title	Tytuł
 	Cmd+Enter to send	Cmd+Enter, aby wysłać
 	Ctrl+Enter to send	Ctrl+Enter, aby wysłać
 	You	Ty
+
+# ChatGPT credential settings; technical helper instructions retain English pending review.
+	ChatGPT settings	Ustawienia ChatGPT
+	Import authentication JSON	Importuj JSON uwierzytelniania
+	Use the ChatGPT Assist login helper on the computer running your browser. Requires uv.	Use the ChatGPT Assist login helper on the computer running your browser. Requires uv.
+	Download the login helper repository	Pobierz repozytorium narzędzia logowania
+	Clone or download the entire repository. In its folder, run this in native PowerShell:	Clone or download the entire repository. In its folder, run this in native PowerShell:
+	Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal.	Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal.
+	Open the generated file:	Open the generated file:
+	Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant.	Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant.
+	Protected credential file JSON	JSON chronionego pliku danych logowania
+	Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart.	Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart.
+	Import and connect	Importuj i połącz
+	Verifying credentials…	Weryfikowanie danych logowania…
+	After importing, clear your clipboard and close the credential editor. Never share the JSON or commit it to Git.	After importing, clear your clipboard and close the credential editor. Never share the JSON or commit it to Git.
+	ChatGPT model	Model ChatGPT
+	Available models appear after importing credentials or connecting.	Available models appear after importing credentials or connecting.
+	ChatGPT Settings → Usage	ChatGPT Settings → Usage
+	uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"	uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"
+	notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"	notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"

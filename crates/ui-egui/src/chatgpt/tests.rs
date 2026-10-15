@@ -105,22 +105,12 @@ fn streamed_replies_are_deduplicated_bounded_and_clearable() {
 }
 
 #[test]
-fn hostile_pagination_outputs_and_urls_are_bounded() {
+fn hostile_pagination_and_outputs_are_bounded() {
     assert_eq!(page(json!([1, 2]), &json!({"offset": u64::MAX}))["items"], json!([]));
     assert_eq!(page(json!([1, 2]), &json!({"limit": u64::MAX}))["items"], json!([1, 2]));
     assert_eq!(page(json!("😀a"), &json!({"offset": 1}))["text"], "a");
     assert_eq!(tool_result(Ok(json!("x".repeat(MAX_OUTPUT + 1))))["success"], true);
     assert_eq!(tool_result(Err("failed".into()))["success"], false);
-    assert!(trusted_login_url("https://auth.openai.com/oauth/authorize?state=abc"));
-    for url in [
-        "http://auth.openai.com/",
-        "https://auth.openai.com.evil.test/",
-        "file:///secret",
-        "javascript:alert(1)",
-        "https://auth.openai.com@evil.test/",
-    ] {
-        assert!(!trusted_login_url(url));
-    }
 }
 
 #[test]
@@ -228,10 +218,51 @@ fn protocol_round_trip_from_account_to_edit_and_stop() {
     assert_eq!(reply["result"]["success"], true);
     assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Revised Hello world");
     app.chatgpt.stop(&ctx).unwrap();
-    assert_eq!(outgoing.try_recv().unwrap()["method"], "turn/interrupt");
-    receive(&mut app, &ctx, call).unwrap();
-    assert_eq!(outgoing.try_recv().unwrap()["result"]["success"], false);
+    assert!(app.chatgpt.client.is_none());
+    assert!(tool_call(&mut app, &call["params"]).is_err());
     assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Revised Hello world");
     receive(&mut app, &ctx, json!({"method": "turn/completed", "params": {"threadId": "thread", "turn": {"status": "interrupted"}}})).unwrap();
     assert!(!app.chatgpt.busy);
+}
+
+#[test]
+fn settings_keep_credentials_out_of_status_and_preferences_and_clear_on_bad_import() {
+    let mut app = app();
+    app.execute("ui.chatgpt.settings", json!({})).unwrap();
+    assert!(app.chatgpt.settings_open);
+    app.chatgpt.auth_json = "not valid credential JSON".into();
+    let status = app.execute("ui.chatgpt.status", json!({})).unwrap().to_string();
+    assert!(!status.contains("not valid"));
+    assert!(!serde_json::to_string(&app.ui).unwrap().contains("not valid"));
+    let error = app.execute("ui.chatgpt.import", json!({"json": "must not be used"})).unwrap_err();
+    assert!(!error.contains("not valid"));
+    assert!(app.chatgpt.auth_json.is_empty());
+    assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Hello world");
+}
+
+#[test]
+fn settings_popup_accepts_multiline_paste_without_editing_document_and_clears_on_close() {
+    use egui_kittest::kittest::Queryable;
+    let mut app = app();
+    app.chatgpt.open = true;
+    app.chatgpt.settings_open = true;
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(4);
+    harness.get_by_label("Protected credential file JSON").focus();
+    harness.run_steps(2);
+    harness.event(egui::Event::Paste("{\n  \"example\": \"test-placeholder\"\n}".into()));
+    harness.run_steps(2);
+    assert!(serde_json::from_str::<Value>(&harness.state().chatgpt.auth_json).is_ok());
+    assert_eq!(harness.state().session.doc.plain_text(StoryRef::Body), "Hello world");
+    harness.get_by_label("Close").click();
+    harness.run_steps(2);
+    assert!(!harness.state().chatgpt.settings_open);
+    assert!(harness.state().chatgpt.auth_json.is_empty());
 }
