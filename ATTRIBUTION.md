@@ -78,3 +78,9 @@ Generated-in-code art is original and has no file to list: the UI icon set (`cra
 | `crates/ui-egui/src/i18n/fr.tsv` | @pechnikov2026-star | Original translation from the English interface labels in this repository; no other product localisation copied | MIT OR Apache-2.0 | French interface catalog |
 | `crates/ui-egui/src/i18n/sv.tsv` | Erik Holmbom (@holmbom) with Claude Code | Original translation from the English interface labels in this repository; no other product localisation or other catalog used | MIT OR Apache-2.0 | Swedish interface catalog; AI-assisted, terminology and the running app reviewed by a native speaker |
 | `crates/ui-egui/src/i18n/hr.tsv` | Andrej Škvorc (@andrejskvorc) with Claude Code (Sonnet 5.5); proofread with Gemini | Original translation from the English interface labels in this repository; no other product localisation copied | MIT OR Apache-2.0 | Croatian interface catalog; reviewed and corrected in the running interface, menu by menu, by the native-speaker author, who also checked the Gemini suggestions |
+
+Windows EXE wizard artwork is drawn in code by `packaging/windows/package-exe.ps1`, using the
+original WordCraft icon attributed above. Generated bitmaps stay in the ignored build directory;
+no third-party wizard artwork is added. Inno Setup supplies the setup engine under its own
+redistributable license. Missing published Rust workspace-root notices are retained with exact
+source revisions in `packaging/windows/notices/` and indexed by `license-overrides.json`.

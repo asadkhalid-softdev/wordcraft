@@ -44,10 +44,27 @@ README continues below; an unchanged copy is also kept in [README_original.md](R
 - **Simple conversation controls:** **⋯ → Clear conversation** clears history and pending actions
   while keeping your login. **Sign out** removes saved credentials and attempts remote revocation.
 
+### Windows setup installer
+
+This fork includes a native `.exe` setup wizard with license acceptance, installation-folder
+selection (including other drives), optional command-line tools, shortcuts and an uninstaller.
+It packages the application and public license/docs files only; each user signs in to their own
+ChatGPT account after installing. Rust is needed only to build, not to install or run it.
+
+To build from native Windows PowerShell, install [Inno Setup](https://jrsoftware.org/isdl.php), then run:
+
+```powershell
+pwsh -File packaging/windows/package-exe.ps1
+```
+
+The installer is written to `dist\release`. See [Windows installer](docs/windows-installer.md)
+for build prerequisites, verification, signing and upgrade details. Linux can continue using the
+Cargo workflow below.
+
 ### Connect your ChatGPT account
 
-1. Clone `https://github.com/asadkhalid-softdev/wordcraft.git`, follow the
-   [Quick start](#quick-start) build steps below, then open **ChatGPT** in the desktop title bar.
+1. Install the Windows EXE, or clone `https://github.com/asadkhalid-softdev/wordcraft.git` and
+   follow the [Quick start](#quick-start) build steps below. Open **ChatGPT** in the desktop title bar.
 2. Click **Continue with ChatGPT** and complete sign-in and authorization in your browser.
 3. Return to WordCraft. It saves the credentials privately, loads your available models and
    connects automatically. Ask for an edit, or attach selected text before sending your request.

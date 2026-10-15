@@ -1,6 +1,6 @@
 # UI parity with Microsoft Word
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously trivial (Modify Table Style formats every table style part, #714); previously trivial: a click on the ribbon chrome hands the keyboard to the page in the same frame, #1093 follow-up; previously trivial: Page Setup vertical alignment, #1320; previously trivial: the app opens on the Home tab every launch, as in Word; previously trivial: no document behind the Start screen, #1129; previously trivial: equation pictures share a few textures, #1002; previously trivial: selection bar in the left margin, #856; previously trivial: table column and row markers on the rulers, #700; previously trivial: table borders and the resize handle drag on the page, #217; previously major: first version; ribbon, dialogs, shortcuts and on-canvas interaction measured from `crates/ui-egui` and the command registry) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (native Windows EXE installer); previously minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously trivial (Modify Table Style formats every table style part, #714); previously trivial: a click on the ribbon chrome hands the keyboard to the page in the same frame, #1093 follow-up; previously trivial: Page Setup vertical alignment, #1320; previously trivial: the app opens on the Home tab every launch, as in Word; previously trivial: no document behind the Start screen, #1129; previously trivial: equation pictures share a few textures, #1002; previously trivial: selection bar in the left margin, #856; previously trivial: table column and row markers on the rulers, #700; previously trivial: table borders and the resize handle drag on the page, #217; previously major: first version; ribbon, dialogs, shortcuts and on-canvas interaction measured from `crates/ui-egui` and the command registry) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 How WordCraft looks and feels next to Word: ribbon, dialogs, panes, keyboard, mouse and touch.
 Typing behaviour has its own checklist ([`typing-parity.md`](typing-parity.md)). All assets are our
@@ -57,10 +57,19 @@ Document title opens Rename Document; the account badge opens Options › Genera
 
 The desktop title bar now opens a resizable, collapsible **ChatGPT** pane. It supports one-click browser sign-in with automatic credential storage, a settings popup for optional OAuth JSON import and account-model selection, streamed replies, a single in-memory conversation, and a three-dot menu for clearing history and signing out. The assistant discovers and executes every registered engine command, with normal Undo. The bundled Rust helper optionally exports JSON; normal browser sign-in imports credentials automatically. Web shows an availability message. Conversation history is reset on document replacement. The selection mini toolbar attaches excerpts as compact composer links with hover-to-remove controls and source highlighting. The right-click menu also offers Add to Chat. Settings expose a persisted, default-on web-search switch; replies include clickable citations, and referenced file paths can be read without replacing the document. Sent references remain navigable; assistant replies preview Markdown tables, code and supported LaTeX equations. See [ChatGPT setup and limits](chatgpt.md). This addition does not change the Word catalog floor.
 
+## Fork Windows installer
+
+[The EXE setup wizard](windows-installer.md) adds per-user installation with license acceptance,
+an installation-folder chooser, optional CLI tools, shortcuts and Open with registration.
+It stages an explicit public payload and keeps the existing native ChatGPT profile and Windows
+permissions. Uninstall preserves documents and saved login. Signing remains a release-time
+configuration; local builds without a configured certificate are unsigned.
+
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-15 | minor | Native per-user Windows EXE installer, license/folder/components/shortcuts pages and uninstall preserving the user profile |
 | 2026-10-15 | minor | WordCraft-owned browser login, automatic credential storage and standalone documentation |
 | 2026-10-15 | minor | Default-on ChatGPT web search, referenced file reads and right-click Add to Chat |
 | 2026-10-15 | minor | ChatGPT selection references, source navigation and native Markdown/equation previews |
