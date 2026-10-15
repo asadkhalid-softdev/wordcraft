@@ -2844,6 +2844,9 @@ fn context_menu(app: &mut WordApp, ui: &mut Ui) {
     }
     item(ui, app, "Cut", "edit.cut", json!({}));
     item(ui, app, "Copy", "edit.copy", json!({}));
+    if !app.session.sel.is_collapsed() {
+        item(ui, app, "Add to Chat", "ui.chatgpt.attachSelection", json!({}));
+    }
     item(ui, app, "Paste", "edit.paste", json!({}));
     ui.separator();
     if let Some(syn) = app.canvas.context_synonyms.clone().and_then(|v| v.as_array().cloned()).filter(|a| !a.is_empty()) {
@@ -3875,6 +3878,38 @@ mod tests {
             h.step();
         }
         assert_eq!(h.state().session.doc.plain_text(StoryRef::Body), "The quick brown fox");
+    }
+
+    #[test]
+    fn selected_text_context_menu_adds_the_range_to_chat_without_editing() {
+        use egui_kittest::kittest::Queryable;
+        let mut app = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("Hello world")), Default::default());
+        app.run("select.text", json!({"text": "world"})).unwrap();
+        let revision = app.session.rev();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+            |ui, app: &mut WordApp| {
+                let ctx = ui.ctx().clone();
+                app.logic(&ctx);
+                app.ui(ui);
+            },
+            app,
+        );
+        h.run_steps(6);
+        let caret = h.state_mut().session.layout().caret(&Pos::body(0, 8)).unwrap();
+        let at = page_to_screen(h.state_mut(), caret.page, caret.x, caret.top + caret.height / 2.0).unwrap();
+        h.event(egui::Event::PointerMoved(at));
+        for pressed in [true, false] {
+            h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed, modifiers: Default::default() });
+            h.step();
+        }
+        h.run_steps(3);
+        h.get_by_label_contains("Add to Chat").click();
+        h.run_steps(3);
+        let status = h.state_mut().execute("ui.chatgpt.status", json!({})).unwrap();
+        assert_eq!(status["references"], 1);
+        assert_eq!(status["open"], true);
+        assert_eq!(h.state().session.selected_text(), "world");
+        assert_eq!(h.state().session.rev(), revision);
     }
 
     #[test]

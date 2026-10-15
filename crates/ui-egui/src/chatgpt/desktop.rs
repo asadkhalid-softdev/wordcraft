@@ -36,7 +36,18 @@ impl Client {
         std::thread::Builder::new()
             .name("wordcraft-chatgpt".into())
             .spawn(move || {
-                let worker = Worker { http: auth::http(), events, writes, ctx, stopped, model, tools: json!([]), history: Vec::new(), serial: 0 };
+                let worker = Worker {
+                    http: auth::http(),
+                    events,
+                    writes,
+                    ctx,
+                    stopped,
+                    model,
+                    tools: json!([]),
+                    history: Vec::new(),
+                    serial: 0,
+                    web_search: true,
+                };
                 worker.run();
             })
             .map_err(|_| "Could not start the ChatGPT connection")?;
@@ -56,6 +67,7 @@ struct Worker {
     tools: Value,
     history: Vec<Value>,
     serial: u64,
+    web_search: bool,
 }
 impl Worker {
     fn emit(&self, value: Value) -> Result<(), String> {
@@ -147,6 +159,7 @@ impl Worker {
                 Ok(json!({"thread": {"id": "document-chat"}}))
             }
             "turn/start" => {
+                self.web_search = p.get("webSearch").and_then(Value::as_bool).unwrap_or(true);
                 let prompt = p.pointer("/input/0/text").and_then(Value::as_str).ok_or("Missing chat prompt")?;
                 self.serial = self.serial.checked_add(1).ok_or("Reconnect to start a new chat")?;
                 let turn = format!("turn-{}", self.serial);
@@ -174,21 +187,31 @@ impl Worker {
                 return Err("Reply stopped".into());
             }
             let token = auth::access(http)?.ok_or("Import ChatGPT credentials in ChatGPT settings first")?;
-            let output = inference::response(http, &token, &self.model, &self.history, &self.tools, &self.stopped, |event| {
-                if event.get("type").and_then(Value::as_str) == Some("response.output_text.delta") {
-                    self.notice(
-                        "item/agentMessage/delta",
-                        json!({"threadId": "document-chat", "itemId": format!("{turn}-{round}"), "delta": event.get("delta")}),
-                    )?;
-                }
-                Ok(())
-            })?;
+            let output = inference::response(
+                http,
+                &token,
+                &self.model,
+                &self.history,
+                inference::ToolOptions { definitions: &self.tools, web_search: self.web_search },
+                &self.stopped,
+                |event| {
+                    if event.get("type").and_then(Value::as_str) == Some("response.output_text.delta") {
+                        self.notice(
+                            "item/agentMessage/delta",
+                            json!({"threadId": "document-chat", "itemId": format!("{turn}-{round}"), "delta": event.get("delta")}),
+                        )?;
+                    } else if let Some(kind) = event.get("type").and_then(Value::as_str) {
+                        self.notice(kind, json!({"threadId": "document-chat"}))?;
+                    }
+                    Ok(())
+                },
+            )?;
             let mut text = String::new();
             for item in &output {
                 if item.get("type").and_then(Value::as_str) == Some("message") {
                     for part in item.get("content").and_then(Value::as_array).into_iter().flatten() {
                         if part.get("type").and_then(Value::as_str) == Some("output_text") {
-                            super::append_bounded(&mut text, part.get("text").and_then(Value::as_str).unwrap_or(""), super::MAX_TEXT);
+                            super::append_bounded(&mut text, &super::citations::text(part), super::MAX_TEXT);
                         }
                     }
                 }
@@ -222,7 +245,19 @@ impl Worker {
                 if result.get("id").and_then(Value::as_str) != Some(id.as_str()) || result.get("result").is_none() {
                     return Err("Document tool connection was interrupted".into());
                 }
-                self.history.push(json!({"type": "function_call_output", "call_id": call_id, "output": result.get("result").map(Value::to_string).unwrap_or_default()}));
+                let mut result = result.get("result").cloned().ok_or("Missing document tool result")?;
+                if name == "wordcraft_read_file" && result.get("success").and_then(Value::as_bool) == Some(true) {
+                    let read = result
+                        .pointer("/contentItems/0/text")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| "Invalid file authorization".to_owned())
+                        .and_then(|text| serde_json::from_str::<Value>(text).map_err(|_| "Invalid file authorization".to_owned()))
+                        .and_then(|authorization| super::files::read(&authorization, &args, &self.stopped));
+                    // Keep actionable sanitized errors from the reader, but never print file contents.
+                    result = super::tool_result(read);
+                    self.notice("item/file/completed", json!({"threadId": "document-chat", "success": result.get("success")}))?;
+                }
+                self.history.push(json!({"type": "function_call_output", "call_id": call_id, "output": result.to_string()}));
             }
         }
         Err("This reply reached its action-round limit. Review the document before continuing.".into())

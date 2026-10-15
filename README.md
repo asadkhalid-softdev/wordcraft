@@ -31,8 +31,14 @@ README continues below; an unchanged copy is also kept in [README_original.md](R
 - **Document editing:** ChatGPT can inspect and edit the loaded document through WordCraft's
   command system, including formatting, tables, styles, layout and review. Edits support normal Undo.
 - **Selected-text context:** select text and click the ChatGPT icon in the floating mini toolbar.
+  You can also right-click a selection and choose **Add to Chat**.
   A compact reference link appears above the chat input. Click it to highlight the source text;
   hover and click **×** to remove it before sending. Sent references remain clickable in history.
+- **Web search:** enabled by default when supported by your model and account. Replies show
+  clickable source citations. Turn it off in **ChatGPT settings → Enable web search**.
+- **Referenced files:** paste a file path into your message to let ChatGPT read it as context
+  without replacing the open document. Any regular file accessible to your OS account can be read;
+  supported documents provide body text, and other binary formats provide paged raw bytes.
 - **Formatted replies:** native Markdown previews for tables, headings, lists, quotes and code
   blocks with copy controls, plus supported LaTeX equation previews.
 - **Simple conversation controls:** **⋯ → Clear conversation** clears history and pending actions

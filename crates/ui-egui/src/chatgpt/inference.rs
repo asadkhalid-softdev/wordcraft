@@ -10,18 +10,33 @@ const MAX_INPUT: usize = 256_000;
 
 pub(super) fn tools(dynamic: &Value) -> Result<Value, String> {
     let items = dynamic.as_array().ok_or("Invalid document tools")?;
-    Ok(Value::Array(
-        items
-            .iter()
-            .take(3)
-            .map(|tool| {
-                json!({
-                    "type": "function", "name": tool.get("name"), "description": tool.get("description"),
-                    "parameters": tool.get("inputSchema"), "strict": false
-                })
+    let functions: Vec<Value> = items
+        .iter()
+        .take(8)
+        .map(|tool| {
+            json!({
+                "type": "function", "name": tool.get("name"), "description": tool.get("description"),
+                "parameters": tool.get("inputSchema"), "strict": false
             })
-            .collect(),
-    ))
+        })
+        .collect();
+    Ok(
+        json!([{"type": "namespace", "name": "wordcraft", "description": "WordCraft document commands and user-referenced file reads", "tools": functions}]),
+    )
+}
+
+fn payload(model: &str, history: &[Value], tools: &Value, web_search: bool) -> Result<Value, String> {
+    let mut tools = tools.as_array().ok_or("Invalid document tools")?.clone();
+    if web_search {
+        tools.push(json!({"type": "web_search"}));
+    }
+    Ok(json!({"model": model, "instructions": INSTRUCTIONS, "input": history, "tools": tools,
+        "store": false, "stream": true, "parallel_tool_calls": false, "include": ["reasoning.encrypted_content"]}))
+}
+
+pub(super) struct ToolOptions<'a> {
+    pub definitions: &'a Value,
+    pub web_search: bool,
 }
 
 pub(super) fn response(
@@ -29,12 +44,11 @@ pub(super) fn response(
     token: &str,
     model: &str,
     history: &[Value],
-    tools: &Value,
+    options: ToolOptions<'_>,
     stopped: &AtomicBool,
     delta: impl FnMut(&Value) -> Result<(), String>,
 ) -> Result<Vec<Value>, String> {
-    let payload = json!({"model": model, "instructions": INSTRUCTIONS, "input": history, "tools": tools,
-        "store": false, "stream": true, "parallel_tool_calls": false, "include": ["reasoning.encrypted_content"]});
+    let payload = payload(model, history, options.definitions, options.web_search)?;
     let bytes = serde_json::to_vec(&payload).map_err(|_| "Could not encode the conversation")?;
     if bytes.len() > MAX_INPUT {
         return Err("Conversation is too long. Clear the conversation to continue.".into());
@@ -47,7 +61,12 @@ pub(super) fn response(
         .send()
         .map_err(|_| "Could not reach ChatGPT. Check the document before retrying; earlier actions may have completed.")?;
     if result.status().as_u16() != 200 {
-        return Err(auth::status_error(result.status().as_u16()));
+        let error = auth::status_error(result.status().as_u16());
+        return Err(if options.web_search && result.status().as_u16() == 400 {
+            format!("{error} Try disabling web search in ChatGPT settings or selecting another model.")
+        } else {
+            error
+        });
     }
     stream(BufReader::new(result), stopped, delta)
 }
@@ -78,7 +97,10 @@ fn stream(mut reader: impl BufRead, stopped: &AtomicBool, mut delta: impl FnMut(
         }
         let event: Value = serde_json::from_str(&raw).map_err(|_| "ChatGPT returned an invalid event")?;
         match event.get("type").and_then(Value::as_str).unwrap_or("") {
-            "response.output_text.delta" => delta(&event)?,
+            "response.output_text.delta"
+            | "response.web_search_call.in_progress"
+            | "response.web_search_call.searching"
+            | "response.web_search_call.completed" => delta(&event)?,
             "response.output_item.done" => {
                 let index = event.get("output_index").and_then(Value::as_u64).filter(|n| *n < 128).ok_or("Invalid streamed output index")?;
                 let item = event
@@ -108,7 +130,8 @@ fn stream(mut reader: impl BufRead, stopped: &AtomicBool, mut delta: impl FnMut(
                     output.clone()
                 };
                 if items.iter().any(|item| {
-                    !item.is_object() || !matches!(item.get("type").and_then(Value::as_str), Some("message" | "reasoning" | "function_call"))
+                    !item.is_object()
+                        || !matches!(item.get("type").and_then(Value::as_str), Some("message" | "reasoning" | "function_call" | "web_search_call"))
                 }) {
                     return Err("ChatGPT returned an unsupported output item".into());
                 }
@@ -194,5 +217,41 @@ mod tests {
         assert!(stream(&text[..], &AtomicBool::new(true), |_| Ok(())).is_err());
         assert!(stream(&b"data: invalid\n\n"[..], &AtomicBool::new(false), |_| Ok(())).is_err());
         assert!(stream(&b"data: \xff\n\n"[..], &AtomicBool::new(false), |_| Ok(())).is_err());
+    }
+}
+
+#[cfg(test)]
+mod search_tests {
+    use super::*;
+    #[test]
+    fn search_toggle_controls_payload_and_preserves_all_namespaced_functions() {
+        let functions = tools(&super::super::tool_definitions()).unwrap();
+        let enabled = payload("account-model", &[], &functions, true).unwrap();
+        assert_eq!(enabled["tools"][0]["type"], "namespace");
+        assert_eq!(enabled["tools"][0]["tools"].as_array().unwrap().len(), 4);
+        assert_eq!(enabled["tools"][1]["type"], "web_search");
+        assert_eq!(enabled["store"], false);
+        assert_eq!(enabled["stream"], true);
+        let disabled = payload("account-model", &[], &functions, false).unwrap();
+        assert_eq!(disabled["tools"].as_array().unwrap().len(), 1);
+        assert_eq!(disabled["model"], "account-model");
+    }
+
+    #[test]
+    fn completed_search_items_survive_stream_and_search_progress_is_forwarded() {
+        let search = json!({"type": "web_search_call", "id": "search", "status": "completed", "action": {"type": "search", "query": "test"}});
+        let events = [
+            json!({"type": "response.web_search_call.searching"}),
+            json!({"type": "response.completed", "response": {"status": "completed", "output": [search.clone()]}}),
+        ];
+        let data: String = events.iter().map(|event| format!("data: {event}\n\n")).collect();
+        let mut progress = false;
+        let output = stream(data.as_bytes(), &AtomicBool::new(false), |event| {
+            progress = event["type"] == "response.web_search_call.searching";
+            Ok(())
+        })
+        .unwrap();
+        assert!(progress);
+        assert_eq!(output, vec![search]);
     }
 }

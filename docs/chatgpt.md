@@ -103,7 +103,8 @@ not itself guarantee that the account has eligible inference access.
 ## Add selected text to a message
 
 1. Select a continuous range in the document. The floating **mini toolbar** appears.
-2. Click its **ChatGPT** speech-bubble/sparkle icon (**Add selection to ChatGPT**). The sidebar
+2. Click its **ChatGPT** speech-bubble/sparkle icon (**Add selection to ChatGPT**), or right-click
+   inside the selection and choose **Add to Chat**. The sidebar
    opens and attaches the selection to your next message.
 3. Type a request, such as “Rewrite this more clearly”, and send it. The assistant receives the
    full excerpt and its document range, even if you select other text before sending.
@@ -133,6 +134,43 @@ Images are shown as their alternative text and never fetched from a model-provid
 file path. Clickable external links allow HTTP, HTTPS and mail links. User messages remain literal
 text so document excerpts and user input are not interpreted as formatting instructions.
 
+## Web search
+
+**Enable web search** in **ChatGPT → ⋯ → ChatGPT settings** is on by default and saved across
+restarts. It offers OpenAI's hosted `web_search` tool; the model decides when a search is useful.
+Turning it off removes that tool from the next message's inference requests without clearing the
+conversation. It does not retract searches already performed or erase existing source context.
+Search availability depends on the selected model and account/workspace policy. If the service
+rejects search, turn the switch off or choose another eligible account model.
+
+Search progress appears in the sidebar. URL citations become clickable numbered links next to
+claims; source links remain available if the provider supplies an invalid citation position.
+Internal provider citation tokens are hidden while a reply streams. Completed search items remain
+in the in-memory model context, alongside completed messages and document tools.
+
+## Read a referenced file
+
+Put a file path in your own chat message, preferably inside backticks or quotes, for example:
+“Compare this document with `C:\Users\YourName\Documents\notes.txt`.” ChatGPT can call
+`wordcraft_read_file` to read that file in the background without opening it in the editor or
+replacing your current document. Absolute paths can point anywhere your OS account may read.
+Relative paths use the open document's directory, or WordCraft's working directory for an unsaved
+document. No elevated permissions, directory browsing or shell commands are added.
+
+A path must occur in your own conversation messages. Paths found only in document contents,
+assistant replies, search results or other tool output do not grant the file reader access.
+Clearing the conversation clears these path references. Existing engine file commands retain
+their usual behavior; the new reader's path check is not a filesystem sandbox for the application.
+
+Reads return up to 32 KiB per call with byte offsets and `nextOffset`/`hasMore` for continuation.
+Auto mode extracts body text from Word, ODT and RTF documents up to 32 MiB without modifying the
+live session. Other files return UTF-8/UTF-16 text when detected, or base64 raw bytes for binary
+content. The model can request explicit text or base64 mode. Raw bytes do not provide OCR, image
+understanding or extracted PDF text. Large rich documents can still be read as paged raw bytes;
+parsing and readable content are separate from filesystem read permission. Referenced file
+contents are sent to OpenAI as needed for the requested response, and remain outside saved UI
+preferences and document files.
+
 ## Conversation and document access
 
 One conversation belongs to the loaded document. Collapsing the sidebar keeps it; **⋯ → Clear
@@ -144,7 +182,7 @@ An in-flight HTTPS request may finish in the background, but cannot dispatch mor
 Earlier edits remain and can be reversed with normal Undo. Ctrl+Enter (Cmd+Enter on macOS) sends;
 ordinary Enter adds a newline.
 
-The assistant uses `wordcraft_commands` to discover every registered engine command and native
+The assistant uses `wordcraft_read_file` for explicitly referenced files, `wordcraft_commands` to discover every registered engine command and native
 printing command, `wordcraft_inspect` to inspect paginated document state, and `wordcraft_execute`
 to dispatch edits through WordCraft's normal command validation and Undo. Unsupported UI dialogs,
 shell execution and arbitrary external tools are excluded. Tool calls must still belong to the
@@ -156,6 +194,9 @@ OpenAI. This does not provide access to your ChatGPT chat history or promise zer
 Tools execute only after `response.completed`; partial, failed or interrupted streams never trigger
 provisional actions. Input, stream size, output item count and action rounds are bounded. Mutating
 requests are not automatically retried.
+
+Official web-search references: [web search and citations](https://developers.openai.com/api/docs/guides/tools-web-search),
+[ChatGPT plan tool support](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
 
 Official protocol references: [registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in),
 [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference),
@@ -175,6 +216,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-15 | Default-on web search with persisted switch and source citations, user-referenced file reader, and right-click Add to Chat |
 | 2026-10-15 | Selection references in the mini toolbar/composer, document navigation and native Markdown/equation previews |
 | 2026-10-15 | Simplified chat controls to Clear conversation and Sign out; both cancel active replies |
 | 2026-10-15 | Standalone WordCraft browser sign-in, automatic credential import, bundled Rust JSON helper and first-party setup guide |

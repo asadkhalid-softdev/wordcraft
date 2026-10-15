@@ -7,7 +7,7 @@ use pulldown_cmark::{Event, Options, Parser, Tag};
 use crate::{WordApp, theme::Tokens};
 
 pub(super) fn show(app: &mut WordApp, ui: &mut egui::Ui, cache: &mut CommonMarkCache, text: &str) {
-    let safe = safe_markdown(&normalize_math(text));
+    let safe = safe_markdown(&normalize_math(&super::citations::strip_markers(text)));
     let mut equations = BTreeMap::new();
     for event in Parser::new_ext(&safe, Options::ENABLE_MATH) {
         let (source, inline) = match event {

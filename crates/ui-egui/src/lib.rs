@@ -260,6 +260,8 @@ pub struct UiState {
     pub show_discord: bool,
     /// Selected account-specific ChatGPT model; credentials are stored separately.
     pub chatgpt_model: String,
+    /// Offer hosted web search for ChatGPT replies; persisted, enabled by default.
+    pub chatgpt_web_search: bool,
     /// User name (File › Options) for comments and tracked changes; empty keeps the default.
     pub author: String,
     /// Desktop: the main window's size and position, restored at the next launch.
@@ -356,6 +358,7 @@ impl Default for UiState {
             nav_tab: "headings".into(),
             show_discord: true,
             chatgpt_model: String::new(),
+            chatgpt_web_search: true,
             author: String::new(),
             window: None,
             language: i18n::AUTO.into(),
@@ -2394,6 +2397,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.chatgpt.attachSelection"
             | "ui.chatgpt.removeReference"
             | "ui.chatgpt.showReference"
+            | "ui.chatgpt.webSearch"
             | "ui.chatgpt.settings"
             | "ui.chatgpt.import"
             | "ui.chatgpt.logout"

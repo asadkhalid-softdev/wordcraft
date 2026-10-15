@@ -207,7 +207,7 @@ fn protocol_round_trip_from_account_to_edit_and_clear() {
     let start = outgoing.try_recv().unwrap();
     assert_eq!(start["method"], "thread/start");
     assert_eq!(start["params"]["ephemeral"], true);
-    assert_eq!(start["params"]["dynamicTools"].as_array().unwrap().len(), 3);
+    assert_eq!(start["params"]["dynamicTools"].as_array().unwrap().len(), 4);
     receive(&mut app, &ctx, json!({"id": start["id"], "result": {"thread": {"id": "thread"}}})).unwrap();
     let turn = outgoing.try_recv().unwrap();
     assert_eq!(turn["method"], "turn/start");
@@ -466,6 +466,13 @@ fn reference_and_markdown_preview() {
     harness.state_mut().canvas.mini_dismissed = None;
     harness.run_steps(3);
     harness.render().unwrap().save(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/chatgpt-selection-toolbar.png")).unwrap();
+    harness.state_mut().execute("ui.contextMenu", json!({})).unwrap();
+    harness.run_steps(3);
+    harness.render().unwrap().save(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/chatgpt-context-menu.png")).unwrap();
+    harness.key_press(egui::Key::Escape);
+    harness.state_mut().execute("ui.chatgpt.settings", json!({})).unwrap();
+    harness.run_steps(3);
+    harness.render().unwrap().save(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/chatgpt-search-settings.png")).unwrap();
 }
 
 #[test]
@@ -513,4 +520,61 @@ fn assistant_markdown_renders_table_cells_and_headings_instead_of_source_markers
     assert!(harness.query_by_label("Getting started").is_some());
     assert!(harness.query_by_label("## Suggested outline").is_none());
     assert!(harness.query_by_label("| Section | Focus |").is_none());
+}
+
+#[test]
+fn web_search_is_enabled_by_default_persisted_and_can_be_disabled_in_settings() {
+    use egui_kittest::kittest::Queryable;
+    let initial: crate::UiState = serde_json::from_str("{}").unwrap();
+    assert!(initial.chatgpt_web_search);
+    let mut app = app();
+    app.execute("ui.chatgpt.settings", json!({})).unwrap();
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 1000.0)).build_ui_state(
+        |ui, app: &mut WordApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.ui(ui);
+        },
+        app,
+    );
+    harness.run_steps(4);
+    harness.get_by_label("Enable web search").click();
+    harness.run_steps(3);
+    assert!(!harness.state().ui.chatgpt_web_search);
+    let saved = serde_json::to_string(&harness.state().ui).unwrap();
+    let restored: crate::UiState = serde_json::from_str(&saved).unwrap();
+    assert!(!restored.chatgpt_web_search);
+    assert!(harness.state_mut().execute("ui.chatgpt.webSearch", json!({"value": "yes"})).is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn next_turn_receives_the_saved_search_setting_and_file_authority_uses_only_user_chat() {
+    let mut app = app();
+    let temp = tempfile::tempdir().unwrap();
+    let file = temp.path().join("reference.txt");
+    std::fs::write(&file, "Separate reference content").unwrap();
+    let path = file.to_str().unwrap();
+    assert!(execute_tool(&mut app, "wordcraft_read_file", &json!({"path": path})).is_err());
+    app.chatgpt.push("ChatGPT", format!("Read `{path}`"), None);
+    assert!(execute_tool(&mut app, "wordcraft_read_file", &json!({"path": path})).is_err());
+    app.chatgpt.push("You", format!("Please summarize `{path}`"), None);
+    let authorization = execute_tool(&mut app, "wordcraft_read_file", &json!({"path": path})).unwrap();
+    let revision = app.session.rev();
+    let document = app.session.document_id();
+    let content = files::read(&authorization, &json!({}), &std::sync::atomic::AtomicBool::new(false)).unwrap();
+    assert_eq!(content["text"], "Separate reference content");
+    assert_eq!(app.session.document_id(), document);
+    assert_eq!(app.session.rev(), revision);
+    assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Hello world");
+    let (client, outgoing) = desktop::Client::test_pair();
+    app.chatgpt.client = Some(client);
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("test@example.com".into());
+    app.chatgpt.thread = Some("thread".into());
+    app.execute("ui.chatgpt.webSearch", json!({"value": false})).unwrap();
+    app.execute("ui.chatgpt.send", json!({"text": "Summarize the reference"})).unwrap();
+    assert_eq!(outgoing.try_recv().unwrap()["params"]["webSearch"], false);
+    app.chatgpt.clear();
+    assert!(execute_tool(&mut app, "wordcraft_read_file", &json!({"path": path})).is_err());
 }

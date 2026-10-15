@@ -1,6 +1,6 @@
 # WordCraft architecture
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (Desktop ChatGPT transport and UI-thread document tools); previously minor (`proof` is per language: English and Polish; previously major: first committed version; `plan/architecture.md` is local-only) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (ChatGPT web search, referenced files and context menu); previously minor (ChatGPT selection references and formatted replies); previously minor (simplified ChatGPT conversation controls); previously minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (Desktop ChatGPT transport and UI-thread document tools); previously minor (`proof` is per language: English and Polish; previously major: first committed version; `plan/architecture.md` is local-only) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 How WordCraft is built today (origin/main `40c5d51`). The longer design notes in
 `plan/architecture.md` are gitignored and local to the original author's machine; this file is the
@@ -52,7 +52,7 @@ winit or rfd.
 
 `ui-egui::chatgpt` owns the sidebar and its document-scoped conversation. On native hosts, `chatgpt::desktop` runs a background direct Responses worker. `chatgpt::auth` validates imported OSS OAuth JSON, stores credentials privately under `chatgpt-direct` in WordCraft’s profile, and serializes atomic token refreshes across processes. `chatgpt::inference` bounds SSE and waits for completed responses before dispatching tools. `chatgpt::auth::login` implements WordCraft-owned PKCE/OIDC browser sign-in and the bundled Rust JSON helper. The settings popup supports automatic sign-in, optional JSON import and account-model discovery; credentials and chat text are excluded from UI preferences.
 
-The model receives three dynamic tools: discover commands, inspect the document, and execute an engine command. Calls return to the UI thread and use `WordApp::execute`, preserving engine validation and Undo. Each call checks the current document, conversation, turn and active state. Closing a conversation cancels its worker and discards its in-memory context; an in-flight HTTPS request cannot dispatch later document actions. This module is disabled for web transport; the WASM UI still compiles. See [chatgpt.md](chatgpt.md).
+The model receives four function tools in a WordCraft namespace: discover commands, inspect the document, read a user-referenced file, and execute an engine command. Hosted web search is offered separately and controlled by a persisted setting, enabled by default. Calls return to the UI thread and use `WordApp::execute`, preserving engine validation and Undo. Each call checks the current document, conversation, turn and active state. Closing a conversation cancels its worker and discards its in-memory context; an in-flight HTTPS request cannot dispatch later document actions. This module is disabled for web transport; the WASM UI still compiles. See [chatgpt.md](chatgpt.md).
 
 `chatgpt::references` bounds in-memory excerpt attachments and validates document ownership,
 relocating unchanged text with boundary context after edits. UI commands attach, remove and reveal
@@ -60,6 +60,13 @@ references through the ordinary selection command. The mini toolbar adds a code-
 icon; the composer and sent messages show local reference links. `chatgpt::markdown` renders
 assistant replies with `egui_commonmark`, reuses WordCraft's math previews, preserves code and
 filters model-provided images and non-web links before rendering.
+
+`chatgpt::files` validates file paths against user-authored chat messages on the UI thread;
+the background transport reads authorized paths with bounded pages and cancellation checks.
+Rich-document extraction creates a separate document model, preserving the live session.
+`chatgpt::citations` formats URL annotations as clickable Markdown links and hides internal citation
+tokens. Search output items remain in Responses history; search progress reaches the sidebar.
+The selection context menu reuses `ui.chatgpt.attachSelection` through **Add to Chat**.
 
 ## Testing and gates
 
@@ -78,6 +85,7 @@ filters model-provided images and non-web links before rendering.
 | Date | Change | Summary |
 |---|---|---|
 | 2026-10-15 | minor | WordCraft-owned browser login, automatic credential storage and standalone documentation |
+| 2026-10-15 | minor | Default-on ChatGPT web search, referenced file reads and right-click Add to Chat |
 | 2026-10-15 | minor | ChatGPT selection references, source navigation and native Markdown/equation previews |
 | 2026-10-15 | minor | Removed Stop and Disconnect controls; Clear conversation and Sign out cancel active replies |
 | 2026-10-15 | minor | Standalone ChatGPT browser sign-in, automatic credential import and bundled Rust helper |
