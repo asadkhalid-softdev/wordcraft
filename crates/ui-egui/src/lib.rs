@@ -27,6 +27,7 @@ pub mod autoscroll;
 pub mod backstage;
 pub mod canvas;
 pub mod caret_glide;
+pub mod chatgpt;
 pub mod chrome;
 pub mod colors;
 pub mod content_controls;
@@ -257,6 +258,8 @@ pub struct UiState {
     pub(crate) legacy_dark: Option<bool>,
     pub nav_tab: String,
     pub show_discord: bool,
+    /// Native Codex CLI executable used by the ChatGPT sidebar.
+    pub chatgpt_executable: String,
     /// User name (File › Options) for comments and tracked changes; empty keeps the default.
     pub author: String,
     /// Desktop: the main window's size and position, restored at the next launch.
@@ -352,6 +355,7 @@ impl Default for UiState {
             legacy_dark: None,
             nav_tab: "headings".into(),
             show_discord: true,
+            chatgpt_executable: "codex".into(),
             author: String::new(),
             window: None,
             language: i18n::AUTO.into(),
@@ -422,6 +426,8 @@ pub struct WordApp {
     pub ui: UiState,
     pub services: Services,
     pub printing: printing::State,
+    /// The document assistant; credentials and conversation are not part of UI preferences.
+    pub chatgpt: chatgpt::State,
     print_feedback_seen: Option<printing::Feedback>,
     pub canvas: canvas::CanvasState,
     /// Content control frames, check boxes and lists on the page.
@@ -575,6 +581,7 @@ impl WordApp {
             ui: UiState::default(),
             services,
             printing: Default::default(),
+            chatgpt: chatgpt::State::default(),
             print_feedback_seen: None,
             canvas: canvas::CanvasState::default(),
             controls: Default::default(),
@@ -822,6 +829,9 @@ impl WordApp {
             let e = tl!("No document is open. Create a document or open one first.").to_string();
             self.status(e.clone());
             return Err(e);
+        }
+        if let Some(r) = chatgpt::command(self, id, &params) {
+            return r;
         }
         if let Some(r) = self.ui_command(id, &params) {
             return r;
@@ -1808,6 +1818,7 @@ impl WordApp {
         self.poll_printing(ctx);
         self.drain_control(ctx);
         zotero::poll(self, ctx);
+        chatgpt::poll(self, ctx);
         read_aloud::poll(self, ctx);
         self.clear_stale_change_picture();
         let _ = self.poll_file_dialog();
@@ -2008,6 +2019,7 @@ impl WordApp {
             chrome::title_bar(self, ui);
             ribbon::show(self, ui);
             chrome::status_bar(self, ui);
+            chatgpt::show(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
             chrome::title_bar(self, ui);
@@ -2375,6 +2387,13 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "view.marks"
             | "view.ruler"
             | "view.numeral"
+            | "ui.chatgpt.toggle"
+            | "ui.chatgpt.connect"
+            | "ui.chatgpt.login"
+            | "ui.chatgpt.logout"
+            | "ui.chatgpt.clear"
+            | "ui.chatgpt.stop"
+            | "ui.chatgpt.status"
             | "ui.tab"
             | "ui.backstage"
             | "ui.dialog"

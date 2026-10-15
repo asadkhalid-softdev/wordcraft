@@ -2672,3 +2672,33 @@ template	Letter	Thư
 # Reading Mode column widths (#1040)
 	Narrow	Hẹp
 	Medium	Trung bình
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	Mở hoặc thu gọn ChatGPT
+	Collapse ChatGPT sidebar	Thu gọn thanh bên ChatGPT
+	Chat options	Tùy chọn trò chuyện
+	Clear conversation	Xóa cuộc trò chuyện
+	Sign out	Đăng xuất
+	Disconnect	Ngắt kết nối
+	Codex executable	Tệp thực thi Codex
+	Use an executable path if Codex is not on PATH.	Nhập đường dẫn tệp thực thi nếu Codex không có trong PATH.
+	ChatGPT document editing is available in the WordCraft desktop app.	Tính năng chỉnh sửa tài liệu bằng ChatGPT có trong ứng dụng WordCraft trên máy tính.
+	Write, revise, and format your document with your ChatGPT account.	Viết, chỉnh sửa và định dạng tài liệu bằng tài khoản ChatGPT của bạn.
+	Connecting…	Đang kết nối…
+	Connect to ChatGPT	Kết nối với ChatGPT
+	Requires the native Codex CLI. Sign-in opens your browser.	Cần có Codex CLI bản gốc cho hệ điều hành. Đăng nhập sẽ mở trình duyệt.
+	Install Codex	Cài đặt Codex
+	Finish signing in in your browser.	Hoàn tất đăng nhập trong trình duyệt.
+	Open sign-in page	Mở trang đăng nhập
+	Cancel sign-in	Hủy đăng nhập
+	Sign in with ChatGPT	Đăng nhập bằng ChatGPT
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	Cuộc trò chuyện có thể đọc và chỉnh sửa tài liệu đang mở. Dùng Hoàn tác để hoàn nguyên thay đổi.
+	How can I help with this document?	Tôi có thể giúp gì với tài liệu này?
+	Try “Make this more concise” or “Format the headings consistently”.	Thử “Viết ngắn gọn hơn” hoặc “Định dạng các tiêu đề nhất quán”.
+	Message ChatGPT	Nhắn tin cho ChatGPT
+	Ask about or edit this document…	Hỏi về tài liệu này hoặc yêu cầu chỉnh sửa…
+	Send	Gửi
+	Cmd+Enter to send	Cmd+Enter để gửi
+	Ctrl+Enter to send	Ctrl+Enter để gửi
+	You	Bạn

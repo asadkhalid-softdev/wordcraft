@@ -1,6 +1,6 @@
 # WordCraft architecture
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** minor (`proof` is per language: English and Polish; previously major: first committed version; `plan/architecture.md` is local-only) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (Desktop ChatGPT transport and UI-thread document tools); previously minor (`proof` is per language: English and Polish; previously major: first committed version; `plan/architecture.md` is local-only) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 How WordCraft is built today (origin/main `40c5d51`). The longer design notes in
 `plan/architecture.md` are gitignored and local to the original author's machine; this file is the
@@ -48,6 +48,12 @@ winit or rfd.
    an egui/wgpu canvas; PDF export walks the same display list through `pdf`.
 5. **Save:** `engine::io` picks a writer by extension.
 
+## ChatGPT document assistant
+
+`ui-egui::chatgpt` owns the sidebar and its document-scoped conversation. On native hosts, `chatgpt::desktop` launches the installed Codex app-server over bounded JSON-lines stdio on background workers. A separate `CODEX_HOME` under WordCraft’s settings folder keeps account state apart from the user’s coding sessions. Codex owns OAuth and token refresh; credentials and chat text are excluded from UI preferences.
+
+The model receives three dynamic tools: discover commands, inspect the document, and execute an engine command. Calls return to the UI thread and use `WordApp::execute`, preserving engine validation and Undo. Each call checks the current document, conversation, turn and stopped state. Closing a conversation terminates its process and discards its ephemeral server state. This module is disabled for web transport; the WASM UI still compiles. See [chatgpt.md](chatgpt.md).
+
 ## Testing and gates
 
 - 821 `#[test]` functions and 10 property-test blocks: model, layout, DOCX round-trip and hostile
@@ -64,5 +70,6 @@ winit or rfd.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-15 | minor | Desktop ChatGPT transport and UI-thread document tools |
 | 2026-10-10 | minor | `proof`: proofing languages (English, Polish), affix engine, Polish patterns; layout and engine route each run by its language |
 | 2026-10-10 | major | First committed architecture doc, from the crates' sources and `AGENTS.md` |

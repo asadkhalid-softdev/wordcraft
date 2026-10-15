@@ -2621,3 +2621,33 @@
 # Reading Mode column widths (#1040)
 	Narrow	Тясна
 	Medium	Средна
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	Отваряне или свиване на ChatGPT
+	Collapse ChatGPT sidebar	Свиване на страничния панел на ChatGPT
+	Chat options	Опции за чата
+	Clear conversation	Изчистване на разговора
+	Sign out	Изход
+	Disconnect	Прекъсване на връзката
+	Codex executable	Изпълним файл на Codex
+	Use an executable path if Codex is not on PATH.	Ако Codex не е в PATH, посочете пътя до изпълнимия файл.
+	ChatGPT document editing is available in the WordCraft desktop app.	Редактирането на документи с ChatGPT е достъпно в настолното приложение WordCraft.
+	Write, revise, and format your document with your ChatGPT account.	Пишете, редактирайте и форматирайте документа със своя акаунт в ChatGPT.
+	Connecting…	Свързване…
+	Connect to ChatGPT	Свързване с ChatGPT
+	Requires the native Codex CLI. Sign-in opens your browser.	Изисква се нативният Codex CLI. Входът отваря браузъра ви.
+	Install Codex	Инсталиране на Codex
+	Finish signing in in your browser.	Завършете влизането в браузъра.
+	Open sign-in page	Отваряне на страницата за вход
+	Cancel sign-in	Отказ от влизането
+	Sign in with ChatGPT	Вход с ChatGPT
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	Чатът може да чете и редактира отворения документ. Използвайте „Отмени“, за да върнете промените.
+	How can I help with this document?	Как мога да помогна с този документ?
+	Try “Make this more concise” or “Format the headings consistently”.	Опитайте „Направи това по-кратко“ или „Форматирай заглавията последователно“.
+	Message ChatGPT	Съобщение до ChatGPT
+	Ask about or edit this document…	Попитайте за документа или поискайте редакция…
+	Send	Изпращане
+	Cmd+Enter to send	Cmd+Enter за изпращане
+	Ctrl+Enter to send	Ctrl+Enter за изпращане
+	You	Вие

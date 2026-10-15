@@ -2641,3 +2641,33 @@ preview	Title	Esempio
 # Reading Mode column widths (#1040)
 	Narrow	Stretta
 	Medium	Media
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	Apri o comprimi ChatGPT
+	Collapse ChatGPT sidebar	Comprimi il pannello ChatGPT
+	Chat options	Opzioni chat
+	Clear conversation	Cancella conversazione
+	Sign out	Esci
+	Disconnect	Disconnetti
+	Codex executable	Eseguibile Codex
+	Use an executable path if Codex is not on PATH.	Se Codex non è in PATH, indica il percorso dell’eseguibile.
+	ChatGPT document editing is available in the WordCraft desktop app.	La modifica dei documenti con ChatGPT è disponibile nell’app desktop WordCraft.
+	Write, revise, and format your document with your ChatGPT account.	Scrivi, rivedi e formatta il documento con il tuo account ChatGPT.
+	Connecting…	Connessione…
+	Connect to ChatGPT	Connetti a ChatGPT
+	Requires the native Codex CLI. Sign-in opens your browser.	Richiede Codex CLI nativo. L’accesso apre il browser.
+	Install Codex	Installa Codex
+	Finish signing in in your browser.	Completa l’accesso nel browser.
+	Open sign-in page	Apri la pagina di accesso
+	Cancel sign-in	Annulla accesso
+	Sign in with ChatGPT	Accedi con ChatGPT
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	La chat può leggere e modificare il documento aperto. Usa Annulla per ripristinare le modifiche.
+	How can I help with this document?	Come posso aiutarti con questo documento?
+	Try “Make this more concise” or “Format the headings consistently”.	Prova “Rendi questo testo più conciso” o “Formatta i titoli in modo coerente”.
+	Message ChatGPT	Messaggio a ChatGPT
+	Ask about or edit this document…	Fai una domanda sul documento o chiedi una modifica…
+	Send	Invia
+	Cmd+Enter to send	Cmd+Invio per inviare
+	Ctrl+Enter to send	Ctrl+Invio per inviare
+	You	Tu

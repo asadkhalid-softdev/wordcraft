@@ -145,6 +145,8 @@ wordcraft-cli run --template sample \
 
 Web: `cd apps/wordcraft-web && trunk serve`, then open <http://127.0.0.1:8771/?sample>.
 
+Desktop ChatGPT sidebar: click **ChatGPT** in the title bar to connect and sign in with your ChatGPT account. Requires the native Codex CLI; see [setup and limits](docs/chatgpt.md).
+
 ## For agents: CLI and MCP
 
 WordCraft was designed to be driven by people *and* by AI agents.

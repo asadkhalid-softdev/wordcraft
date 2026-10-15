@@ -10,6 +10,7 @@ use crate::WordApp;
 use crate::theme::{Tokens, regular, semibold};
 
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
+    crate::chatgpt::show(app, ui);
     let t = Tokens::get(ui.ctx());
     // SmartArt Design › Text Pane, while a SmartArt graphic WordCraft can edit is selected.
     if app.session.view.smart_art_pane && wordcraft_engine::cmd::smart_art::selected_smart_art(&app.session).is_some() {

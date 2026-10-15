@@ -2628,3 +2628,33 @@
 # Reading Mode column widths (#1040)
 	Narrow	Keskeny
 	Medium	Közepes
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	ChatGPT megnyitása vagy összecsukása
+	Collapse ChatGPT sidebar	ChatGPT oldalsáv összecsukása
+	Chat options	Csevegési beállítások
+	Clear conversation	Beszélgetés törlése
+	Sign out	Kijelentkezés
+	Disconnect	Kapcsolat bontása
+	Codex executable	Codex futtatható fájl
+	Use an executable path if Codex is not on PATH.	Ha a Codex nincs a PATH-ban, adja meg a futtatható fájl elérési útját.
+	ChatGPT document editing is available in the WordCraft desktop app.	A ChatGPT dokumentumszerkesztés a WordCraft asztali alkalmazásban érhető el.
+	Write, revise, and format your document with your ChatGPT account.	Írjon, javítson és formázzon dokumentumokat ChatGPT-fiókjával.
+	Connecting…	Csatlakozás…
+	Connect to ChatGPT	Csatlakozás a ChatGPT-hez
+	Requires the native Codex CLI. Sign-in opens your browser.	Natív Codex CLI szükséges. A bejelentkezés megnyitja a böngészőt.
+	Install Codex	Codex telepítése
+	Finish signing in in your browser.	Fejezze be a bejelentkezést a böngészőben.
+	Open sign-in page	Bejelentkezési oldal megnyitása
+	Cancel sign-in	Bejelentkezés megszakítása
+	Sign in with ChatGPT	Bejelentkezés ChatGPT-fiókkal
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	A csevegés olvashatja és szerkesztheti a megnyitott dokumentumot. A módosítások visszavonhatók.
+	How can I help with this document?	Miben segíthetek ezzel a dokumentummal?
+	Try “Make this more concise” or “Format the headings consistently”.	Próbálja ki: „Legyen tömörebb” vagy „Formázza egységesen a címsorokat”.
+	Message ChatGPT	Üzenet a ChatGPT-nek
+	Ask about or edit this document…	Kérdezzen a dokumentumról, vagy kérjen módosítást…
+	Send	Küldés
+	Cmd+Enter to send	Küldés: Cmd+Enter
+	Ctrl+Enter to send	Küldés: Ctrl+Enter
+	You	Ön

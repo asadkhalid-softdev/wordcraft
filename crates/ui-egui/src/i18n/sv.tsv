@@ -2647,3 +2647,33 @@ preview	Title	Titel
 	Bottom Right Cell	Nedre högra cellen
 	Inside Horizontal Border	Inre vågrät kantlinje
 	Inside Vertical Border	Inre lodrät kantlinje
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	Öppna eller fäll ihop ChatGPT
+	Collapse ChatGPT sidebar	Fäll ihop ChatGPT-panelen
+	Chat options	Chattalternativ
+	Clear conversation	Rensa konversation
+	Sign out	Logga ut
+	Disconnect	Koppla från
+	Codex executable	Körbar Codex-fil
+	Use an executable path if Codex is not on PATH.	Ange sökvägen till programfilen om Codex inte finns i PATH.
+	ChatGPT document editing is available in the WordCraft desktop app.	Dokumentredigering med ChatGPT finns i WordCrafts skrivbordsapp.
+	Write, revise, and format your document with your ChatGPT account.	Skriv, bearbeta och formatera dokumentet med ditt ChatGPT-konto.
+	Connecting…	Ansluter…
+	Connect to ChatGPT	Anslut till ChatGPT
+	Requires the native Codex CLI. Sign-in opens your browser.	Kräver Codex CLI för ditt operativsystem. Inloggningen öppnar webbläsaren.
+	Install Codex	Installera Codex
+	Finish signing in in your browser.	Slutför inloggningen i webbläsaren.
+	Open sign-in page	Öppna inloggningssidan
+	Cancel sign-in	Avbryt inloggning
+	Sign in with ChatGPT	Logga in med ChatGPT
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	Chatten kan läsa och redigera det öppna dokumentet. Använd Ångra för att återställa ändringar.
+	How can I help with this document?	Hur kan jag hjälpa till med dokumentet?
+	Try “Make this more concise” or “Format the headings consistently”.	Prova ”Gör texten mer kortfattad” eller ”Formatera rubrikerna enhetligt”.
+	Message ChatGPT	Meddelande till ChatGPT
+	Ask about or edit this document…	Ställ en fråga om dokumentet eller be om en ändring…
+	Send	Skicka
+	Cmd+Enter to send	Cmd+Enter för att skicka
+	Ctrl+Enter to send	Ctrl+Enter för att skicka
+	You	Du

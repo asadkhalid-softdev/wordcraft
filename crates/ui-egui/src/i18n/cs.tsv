@@ -2624,3 +2624,33 @@ preview	Title	Ukázka
 # Reading Mode column widths (#1040)
 	Narrow	Úzká
 	Medium	Střední
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	Otevřít nebo sbalit ChatGPT
+	Collapse ChatGPT sidebar	Sbalit postranní panel ChatGPT
+	Chat options	Možnosti chatu
+	Clear conversation	Vymazat konverzaci
+	Sign out	Odhlásit se
+	Disconnect	Odpojit
+	Codex executable	Spustitelný soubor Codex
+	Use an executable path if Codex is not on PATH.	Pokud Codex není v PATH, zadejte cestu ke spustitelnému souboru.
+	ChatGPT document editing is available in the WordCraft desktop app.	Úpravy dokumentů pomocí ChatGPT jsou dostupné v aplikaci WordCraft pro počítače.
+	Write, revise, and format your document with your ChatGPT account.	Pište, upravujte a formátujte dokument pomocí svého účtu ChatGPT.
+	Connecting…	Připojování…
+	Connect to ChatGPT	Připojit k ChatGPT
+	Requires the native Codex CLI. Sign-in opens your browser.	Vyžaduje nativní Codex CLI. Přihlášení otevře prohlížeč.
+	Install Codex	Nainstalovat Codex
+	Finish signing in in your browser.	Dokončete přihlášení v prohlížeči.
+	Open sign-in page	Otevřít přihlašovací stránku
+	Cancel sign-in	Zrušit přihlášení
+	Sign in with ChatGPT	Přihlásit se pomocí ChatGPT
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	Chat může číst a upravovat otevřený dokument. Úpravy můžete vrátit příkazem Zpět.
+	How can I help with this document?	Jak mohu pomoci s tímto dokumentem?
+	Try “Make this more concise” or “Format the headings consistently”.	Zkuste „Zkrať tento text“ nebo „Sjednoť formátování nadpisů“.
+	Message ChatGPT	Zpráva pro ChatGPT
+	Ask about or edit this document…	Zeptejte se na dokument nebo požádejte o úpravu…
+	Send	Odeslat
+	Cmd+Enter to send	Cmd+Enter pro odeslání
+	Ctrl+Enter to send	Ctrl+Enter pro odeslání
+	You	Vy

@@ -2632,3 +2632,33 @@ preview	Title	Naslov
 	Bottom Right Cell	Donja desna ćelija
 	Inside Horizontal Border	Unutarnji vodoravni obrub
 	Inside Vertical Border	Unutarnji okomiti obrub
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	Otvori ili sažmi ChatGPT
+	Collapse ChatGPT sidebar	Sažmi bočnu traku ChatGPT-a
+	Chat options	Mogućnosti razgovora
+	Clear conversation	Očisti razgovor
+	Sign out	Odjavi se
+	Disconnect	Prekini vezu
+	Codex executable	Izvršna datoteka Codexa
+	Use an executable path if Codex is not on PATH.	Ako Codex nije u PATH-u, unesite put do izvršne datoteke.
+	ChatGPT document editing is available in the WordCraft desktop app.	Uređivanje dokumenata putem ChatGPT-a dostupno je u aplikaciji WordCraft za računala.
+	Write, revise, and format your document with your ChatGPT account.	Pišite, pregledavajte i oblikujte dokument svojim ChatGPT računom.
+	Connecting…	Povezivanje…
+	Connect to ChatGPT	Poveži se s ChatGPT-om
+	Requires the native Codex CLI. Sign-in opens your browser.	Potreban je izvorni Codex CLI. Prijava otvara preglednik.
+	Install Codex	Instaliraj Codex
+	Finish signing in in your browser.	Dovršite prijavu u pregledniku.
+	Open sign-in page	Otvori stranicu za prijavu
+	Cancel sign-in	Otkaži prijavu
+	Sign in with ChatGPT	Prijavi se putem ChatGPT-a
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	Razgovor može čitati i uređivati otvoreni dokument. Uređivanja možete poništiti naredbom Poništi.
+	How can I help with this document?	Kako mogu pomoći s ovim dokumentom?
+	Try “Make this more concise” or “Format the headings consistently”.	Pokušajte „Skrati ovaj tekst” ili „Dosljedno oblikuj naslove”.
+	Message ChatGPT	Poruka za ChatGPT
+	Ask about or edit this document…	Postavite pitanje o dokumentu ili zatražite izmjenu…
+	Send	Pošalji
+	Cmd+Enter to send	Cmd+Enter za slanje
+	Ctrl+Enter to send	Ctrl+Enter za slanje
+	You	Vi

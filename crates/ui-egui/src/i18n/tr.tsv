@@ -2629,3 +2629,33 @@ preview	Title	Örnek
 # Reading Mode column widths (#1040)
 	Narrow	Dar
 	Medium	Orta
+
+# ChatGPT document sidebar
+	ChatGPT	ChatGPT
+	Open or collapse ChatGPT	ChatGPT’yi aç veya daralt
+	Collapse ChatGPT sidebar	ChatGPT kenar çubuğunu daralt
+	Chat options	Sohbet seçenekleri
+	Clear conversation	Sohbeti temizle
+	Sign out	Oturumu kapat
+	Disconnect	Bağlantıyı kes
+	Codex executable	Codex çalıştırılabilir dosyası
+	Use an executable path if Codex is not on PATH.	Codex PATH içinde değilse çalıştırılabilir dosyanın yolunu girin.
+	ChatGPT document editing is available in the WordCraft desktop app.	ChatGPT ile belge düzenleme WordCraft masaüstü uygulamasında kullanılabilir.
+	Write, revise, and format your document with your ChatGPT account.	ChatGPT hesabınızla belgenizi yazın, gözden geçirin ve biçimlendirin.
+	Connecting…	Bağlanıyor…
+	Connect to ChatGPT	ChatGPT’ye bağlan
+	Requires the native Codex CLI. Sign-in opens your browser.	Yerel Codex CLI gereklidir. Oturum açmak tarayıcınızı açar.
+	Install Codex	Codex’i yükle
+	Finish signing in in your browser.	Tarayıcınızda oturum açmayı tamamlayın.
+	Open sign-in page	Oturum açma sayfasını aç
+	Cancel sign-in	Oturum açmayı iptal et
+	Sign in with ChatGPT	ChatGPT ile oturum aç
+	Chat can read and edit the loaded document. Use Undo to reverse edits.	Sohbet açık belgeyi okuyabilir ve düzenleyebilir. Düzenlemeleri Geri Al ile geri alın.
+	How can I help with this document?	Bu belgeyle ilgili nasıl yardımcı olabilirim?
+	Try “Make this more concise” or “Format the headings consistently”.	“Bunu kısalt” veya “Başlıkları tutarlı biçimlendir” yazmayı deneyin.
+	Message ChatGPT	ChatGPT’ye mesaj
+	Ask about or edit this document…	Bu belge hakkında soru sorun veya düzenleme isteyin…
+	Send	Gönder
+	Cmd+Enter to send	Göndermek için Cmd+Enter
+	Ctrl+Enter to send	Göndermek için Ctrl+Enter
+	You	Siz

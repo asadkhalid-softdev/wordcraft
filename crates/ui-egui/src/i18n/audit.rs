@@ -255,6 +255,10 @@ fn untranslated_interface_text() {
         record(&app, &format!("pane {pane}"), drawn);
         let _ = app.run(pane, json!({"value": false}));
     }
+    let _ = app.run("ui.chatgpt.toggle", json!({"value": true}));
+    let drawn = frame(&ctx, &mut app);
+    record(&app, "pane ChatGPT", drawn);
+    let _ = app.run("ui.chatgpt.toggle", json!({"value": false}));
     // Right-click on the page (centred in the window).
     let drawn = frames(&ctx, &mut app, click(egui::pos2(1280.0, 520.0), egui::PointerButton::Secondary));
     record(&app, "context menu", drawn);
