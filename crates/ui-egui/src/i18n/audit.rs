@@ -261,6 +261,9 @@ fn untranslated_interface_text() {
     let _ = app.run("ui.chatgpt.settings", json!({}));
     let drawn = frame(&ctx, &mut app);
     record(&app, "ChatGPT settings", drawn);
+    let _ = app.run("ui.chatgpt.settings", json!({"advanced": true}));
+    let drawn = frame(&ctx, &mut app);
+    record(&app, "ChatGPT advanced settings", drawn);
     app.chatgpt.settings_open = false;
     let _ = app.run("ui.chatgpt.toggle", json!({"value": false}));
     // Right-click on the page (centred in the window).

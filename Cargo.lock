@@ -6356,10 +6356,12 @@ dependencies = [
 name = "wordcraft-ui-egui"
 version = "0.7.0"
 dependencies = [
+ "base64 0.22.1",
  "craft-ui",
  "egui",
  "egui_kittest",
  "fs2",
+ "getrandom 0.3.4",
  "image",
  "js-sys",
  "jsonwebtoken",
@@ -6368,10 +6370,13 @@ dependencies = [
  "rsa",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "sys-locale",
  "tempfile",
  "toml",
  "unicode-bidi",
+ "url",
+ "webbrowser",
  "wordcraft-control-key",
  "wordcraft-doc",
  "wordcraft-engine",

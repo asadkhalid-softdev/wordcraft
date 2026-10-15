@@ -246,6 +246,7 @@ fn settings_popup_accepts_multiline_paste_without_editing_document_and_clears_on
     let mut app = app();
     app.chatgpt.open = true;
     app.chatgpt.settings_open = true;
+    app.chatgpt.advanced_auth = true;
     let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
         |ui, app: &mut WordApp| {
             let ctx = ui.ctx().clone();
@@ -265,4 +266,42 @@ fn settings_popup_accepts_multiline_paste_without_editing_document_and_clears_on
     harness.run_steps(2);
     assert!(!harness.state().chatgpt.settings_open);
     assert!(harness.state().chatgpt.auth_json.is_empty());
+}
+
+#[test]
+fn native_login_notification_opens_only_the_trusted_browser_url_and_cancel_resets_it() {
+    let mut app = app();
+    let ctx = egui::Context::default();
+    app.chatgpt.logging_in = true;
+    assert!(app.chatgpt.notification(&ctx, "account/login/url", &json!({"url":"https://evil.test/"})).is_err());
+    app.chatgpt.notification(&ctx, "account/login/url", &json!({"url":"https://auth.openai.com/api/accounts/authorize?state=test"})).unwrap();
+    assert!(app.chatgpt.login_url.is_some());
+    app.execute("ui.chatgpt.cancelLogin", json!({})).unwrap();
+    assert!(!app.chatgpt.logging_in);
+    assert!(app.chatgpt.login_url.is_none());
+    app.chatgpt.notification(&ctx, "account/login/url", &json!({"url":"https://auth.openai.com/api/accounts/authorize"})).unwrap();
+    assert!(app.chatgpt.login_url.is_none());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn browser_login_result_connects_automatically_and_preserves_document() {
+    let mut app = app();
+    let ctx = egui::Context::default();
+    let (client, outgoing) = desktop::Client::test_pair();
+    app.chatgpt.client = Some(client);
+    app.chatgpt.logging_in = true;
+    app.chatgpt.settings_open = true;
+    app.chatgpt.request(&ctx, "account/login/start", json!({"newAccount": false}), Request::Login).unwrap();
+    let request = outgoing.try_recv().unwrap();
+    receive(&mut app, &ctx, json!({"id":request["id"],"result":{
+        "account":{"type":"chatgpt","email":"ChatGPT account"},"models":[{"slug":"account-model","display_name":"Account model"}],"model":"account-model"
+    }})).unwrap();
+    assert!(app.chatgpt.ready);
+    assert!(app.chatgpt.account.is_some());
+    assert!(!app.chatgpt.logging_in);
+    assert!(!app.chatgpt.settings_open);
+    assert_eq!(app.chatgpt.model, "account-model");
+    assert!(app.chatgpt.auth_json.is_empty());
+    assert_eq!(app.session.doc.plain_text(StoryRef::Body), "Hello world");
 }

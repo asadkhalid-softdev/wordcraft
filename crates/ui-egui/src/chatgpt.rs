@@ -44,6 +44,7 @@ enum Request {
     Initialize,
     Account,
     Import,
+    Login,
     Logout,
     Thread(String),
     Turn,
@@ -61,6 +62,9 @@ pub struct State {
     pub(crate) settings_open: bool,
     auth_json: String,
     importing: bool,
+    logging_in: bool,
+    login_url: Option<String>,
+    pub(crate) advanced_auth: bool,
     models: Vec<Value>,
     model: String,
     draft: String,
@@ -100,6 +104,8 @@ impl State {
         self.busy = false;
         self.stopping = false;
         self.importing = false;
+        self.logging_in = false;
+        self.login_url = None;
         self.active_at = None;
         self.pending.clear();
         self.next_id = 0;
@@ -168,6 +174,25 @@ impl State {
     #[cfg(target_arch = "wasm32")]
     fn connect(&mut self, _ctx: &egui::Context, _model: &str) -> Result<(), String> {
         Err("ChatGPT integration is available in the WordCraft desktop app".into())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn login(&mut self, ctx: &egui::Context, model: &str, new_account: bool) -> Result<(), String> {
+        if self.busy || self.logging_in || self.importing {
+            return Err("Finish or cancel the current operation first".into());
+        }
+        self.clear();
+        clear_auth_input(self);
+        self.model = model.into();
+        self.client = Some(desktop::Client::start(model, ctx.clone())?);
+        self.connecting = true;
+        self.logging_in = true;
+        self.request(ctx, "account/login/start", json!({"newAccount": new_account}), Request::Login)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn login(&mut self, _ctx: &egui::Context, _model: &str, _new_account: bool) -> Result<(), String> {
+        Err("ChatGPT login is available in the desktop app".into())
     }
 
     fn start_turn(&mut self, ctx: &egui::Context, prompt: String) -> Result<(), String> {
@@ -259,6 +284,12 @@ impl State {
                 self.connecting = false;
                 self.apply_account(r);
             }
+            Request::Login => {
+                self.logging_in = false;
+                self.login_url = None;
+                self.settings_open = false;
+                self.apply_account(r);
+            }
             Request::Import => {
                 self.importing = false;
                 self.settings_open = false;
@@ -294,6 +325,21 @@ impl State {
     }
 
     fn notification(&mut self, ctx: &egui::Context, method: &str, p: &Value) -> Result<(), String> {
+        if method == "account/login/url" {
+            if !self.logging_in {
+                return Ok(());
+            }
+            let url = p
+                .get("url")
+                .and_then(Value::as_str)
+                .filter(|url| url.len() <= 16_000 && url.starts_with("https://auth.openai.com/"))
+                .ok_or("Invalid ChatGPT sign-in URL")?;
+            if self.login_url.is_none() {
+                ctx.open_url(egui::OpenUrl::new_tab(url));
+            }
+            self.login_url = Some(url.into());
+            return Ok(());
+        }
         if p.get("threadId").and_then(Value::as_str) != self.thread.as_deref() || self.thread.is_none() {
             return Ok(());
         }
@@ -487,7 +533,9 @@ pub fn poll(app: &mut WordApp, ctx: &egui::Context) {
         app.ui.chatgpt_model = app.chatgpt.model.clone();
     }
     let now = ctx.input(|i| i.time);
-    if app.chatgpt.active_at.is_some_and(|at| now - at > 300.0) || app.chatgpt.pending.values().any(|p| now - p.at > 90.0) {
+    if app.chatgpt.active_at.is_some_and(|at| now - at > 300.0)
+        || app.chatgpt.pending.values().any(|p| now - p.at > if matches!(p.request, Request::Login) { 600.0 } else { 90.0 })
+    {
         app.chatgpt.fail("ChatGPT took too long to respond. Reconnect and try again.".into());
     }
     if app.chatgpt.busy || !app.chatgpt.pending.is_empty() {
@@ -563,10 +611,11 @@ pub fn commands(app: &WordApp) -> Vec<Value> {
     [
         ("toggle", "ChatGPT sidebar", r#"{"value"?: bool}"#),
         ("connect", "Connect to ChatGPT", "{}"),
-        ("login", "ChatGPT settings", "{} (opens credential import settings)"),
+        ("login", "Continue with ChatGPT", r#"{"newAccount"?: bool} (opens browser, stores credentials and connects automatically)"#),
         ("settings", "ChatGPT settings", "{}"),
         ("import", "Import ChatGPT credentials", "{} (uses the private settings field; no credentials in command params)"),
         ("logout", "Sign out of ChatGPT", "{}"),
+        ("cancelLogin", "Cancel sign-in", "{}"),
         ("clear", "Clear conversation", "{} (also stops any active reply)"),
         ("stop", "Stop reply", "{}"),
         ("send", "Send message", r#"{"text": string}"#),
@@ -595,8 +644,14 @@ pub fn command(app: &mut WordApp, id: &str, params: &Value) -> Option<Result<Val
             }
         }
         "connect" => app.chatgpt.connect(&ctx, &app.ui.chatgpt_model),
-        "login" | "settings" => {
+        "login" => app.chatgpt.login(&ctx, &app.ui.chatgpt_model, params.get("newAccount").and_then(Value::as_bool).unwrap_or(false)),
+        "settings" => {
             app.chatgpt.settings_open = true;
+            app.chatgpt.advanced_auth = params.get("advanced").and_then(Value::as_bool).unwrap_or(false);
+            Ok(())
+        }
+        "cancelLogin" => {
+            app.chatgpt.disconnect();
             Ok(())
         }
         "import" => import_credentials(app, &ctx),
@@ -654,44 +709,103 @@ fn import_credentials(app: &mut WordApp, ctx: &egui::Context) -> Result<(), Stri
     result
 }
 
+fn login_controls(app: &mut WordApp, ui: &mut Ui) {
+    if app.chatgpt.logging_in {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(if app.chatgpt.login_url.is_some() { crate::tl!("Finish signing in in your browser.") } else { crate::tl!("Connecting…") });
+        });
+        if let Some(url) = &app.chatgpt.login_url {
+            ui.hyperlink_to(crate::tl!("Open sign-in page"), url);
+        }
+        if ui.button(crate::tl!("Cancel sign-in")).clicked() {
+            act(app, "cancelLogin", json!({}));
+        }
+    } else if app.chatgpt.account.is_none()
+        && ui.add_enabled(!app.chatgpt.busy && !app.chatgpt.importing, egui::Button::new(crate::tl!("Continue with ChatGPT"))).clicked()
+    {
+        act(app, "login", json!({}));
+    }
+}
+
 fn settings(app: &mut WordApp, ctx: &egui::Context) {
     if !app.chatgpt.settings_open {
         return;
     }
     let mut open = true;
-    egui::Window::new(crate::tl!("ChatGPT settings")).id(egui::Id::new("chatgpt_settings"))
-        .open(&mut open).default_width(560.0).resizable(false).collapsible(false).show(ctx, |ui| {
+    egui::Window::new(crate::tl!("ChatGPT settings"))
+        .id(egui::Id::new("chatgpt_settings"))
+        .open(&mut open)
+        .default_width(560.0)
+        .resizable(false)
+        .collapsible(false)
+        .show(ctx, |ui| {
             egui::ScrollArea::vertical().max_height(660.0).show(ui, |ui| {
-                ui.label(crate::tl!("Import authentication JSON"));
-                ui.label(crate::tl!("Use the ChatGPT Assist login helper on the computer running your browser. Requires uv."));
-                ui.hyperlink_to(crate::tl!("Download the login helper repository"), "https://github.com/asadkhalid-softdev/hass-chatgpt-integration");
-                ui.label(crate::tl!("Clone or download the entire repository. In its folder, run this in native PowerShell:"));
-                ui.add(egui::Label::new(crate::tl!(r#"uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json""#)).selectable(true).wrap());
-                ui.label(crate::tl!("Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal."));
-                ui.label(crate::tl!("Open the generated file:"));
-                ui.add(egui::Label::new(crate::tl!(r#"notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json""#)).selectable(true).wrap());
-                ui.label(crate::tl!("Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant."));
-                let label = ui.label(crate::tl!("Protected credential file JSON"));
-                ui.add(egui::TextEdit::singleline(&mut app.chatgpt.auth_json).password(true).char_limit(64_000).desired_width(f32::INFINITY))
-                    .labelled_by(label.id);
-                ui.small(crate::tl!("Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart."));
-                if let Some(error) = &app.chatgpt.error { ui.label(error); }
-                ui.horizontal(|ui| {
-                    if ui.add_enabled(!app.chatgpt.busy && !app.chatgpt.importing && !app.chatgpt.auth_json.trim().is_empty(), egui::Button::new(crate::tl!("Import and connect"))).clicked() {
-                        act(app, "import", json!({}));
-                    }
-                    if app.chatgpt.importing { ui.spinner(); ui.label(crate::tl!("Verifying credentials…")); }
-                    if ui.button(crate::tl!("Close" )).clicked() { app.chatgpt.settings_open = false; }
-                });
-                ui.small(crate::tl!("After importing, clear your clipboard and close the credential editor. Never share the JSON or commit it to Git."));
+                ui.label(crate::tl!("Connect your ChatGPT account to WordCraft."));
+                login_controls(app, ui);
+                ui.small(crate::tl!(
+                    "Sign in in your browser. WordCraft saves the credentials and connects automatically. Login persists after restart."
+                ));
+                if !app.chatgpt.logging_in && ui.add_enabled(!app.chatgpt.busy, egui::Button::new(crate::tl!("Use a different account"))).clicked() {
+                    act(app, "login", json!({"newAccount": true}));
+                }
+                if let Some(error) = &app.chatgpt.error {
+                    ui.label(error);
+                }
+                ui.add_space(8.0);
+                let advanced = egui::CollapsingHeader::new(crate::tl!("Advanced: import authentication JSON"))
+                    .open(Some(app.chatgpt.advanced_auth))
+                    .show(ui, |ui| {
+                        ui.label(crate::tl!("Optional: use WordCraft’s bundled Rust helper to create a protected JSON file."));
+                        ui.label(crate::tl!("Run this from the WordCraft repository in native PowerShell:"));
+                        ui.add(egui::Label::new(crate::tl!("cargo run -p wordcraft-ui-egui --bin wordcraft-chatgpt-login")).selectable(true).wrap());
+                        ui.label(crate::tl!("Complete browser sign-in, wait for Sign-in verified, then open the generated file:"));
+                        ui.add(
+                            egui::Label::new(crate::tl!(r#"notepad "$env:APPDATA\WordCraft\chatgpt-login\wordcraft-account.json""#))
+                                .selectable(true)
+                                .wrap(),
+                        );
+                        let label = ui.label(crate::tl!("Protected credential file JSON"));
+                        ui.add(egui::TextEdit::singleline(&mut app.chatgpt.auth_json).password(true).char_limit(64_000).desired_width(f32::INFINITY))
+                            .labelled_by(label.id);
+                        if ui
+                            .add_enabled(
+                                !app.chatgpt.busy && !app.chatgpt.logging_in && !app.chatgpt.importing && !app.chatgpt.auth_json.trim().is_empty(),
+                                egui::Button::new(crate::tl!("Import and connect")),
+                            )
+                            .clicked()
+                        {
+                            act(app, "import", json!({}));
+                        }
+                        if app.chatgpt.importing {
+                            ui.spinner();
+                            ui.label(crate::tl!("Verifying credentials…"));
+                        }
+                        ui.small(crate::tl!(
+                            "Keep credential JSON private. Never share it or commit it to Git. Clear your clipboard after importing."
+                        ));
+                    });
+                if advanced.header_response.clicked() {
+                    app.chatgpt.advanced_auth = !app.chatgpt.advanced_auth;
+                }
+                if ui.button(crate::tl!("Close")).clicked() {
+                    app.chatgpt.settings_open = false;
+                }
                 ui.separator();
                 ui.label(crate::tl!("ChatGPT model"));
                 if app.chatgpt.models.is_empty() {
                     ui.small(crate::tl!("Available models appear after importing credentials or connecting."));
                 } else {
                     let mut model = app.ui.chatgpt_model.clone();
-                    let selected = app.chatgpt.models.iter().find(|m| m.get("slug").and_then(Value::as_str) == Some(model.as_str()))
-                        .and_then(|m| m.get("display_name")).and_then(Value::as_str).unwrap_or(&model).to_owned();
+                    let selected = app
+                        .chatgpt
+                        .models
+                        .iter()
+                        .find(|m| m.get("slug").and_then(Value::as_str) == Some(model.as_str()))
+                        .and_then(|m| m.get("display_name"))
+                        .and_then(Value::as_str)
+                        .unwrap_or(&model)
+                        .to_owned();
                     egui::ComboBox::from_id_salt("chatgpt_model").selected_text(selected).show_ui(ui, |ui| {
                         for item in &app.chatgpt.models {
                             if let Some(slug) = item.get("slug").and_then(Value::as_str) {
@@ -781,22 +895,13 @@ fn panel(app: &mut WordApp, ui: &mut Ui) {
         });
         ui.add_space(6.0);
     }
-    if !app.chatgpt.ready {
+    if !app.chatgpt.ready || app.chatgpt.account.is_none() || app.chatgpt.logging_in {
         ui.label(crate::tl!("Write, revise, and format your document with your ChatGPT account."));
         ui.add_space(8.0);
-        if app.chatgpt.connecting {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(crate::tl!("Connecting…"));
-            });
-        } else if ui.button(crate::tl!("Connect to ChatGPT")).clicked() {
-            act(app, "connect", json!({}));
-        }
+        login_controls(app, ui);
         if ui.button(crate::tl!("ChatGPT settings")).clicked() {
             act(app, "settings", json!({}));
         }
-    } else if app.chatgpt.account.is_none() && ui.button(crate::tl!("Import authentication JSON")).clicked() {
-        act(app, "settings", json!({}));
     }
     ui.add_space(6.0);
     ui.label(RichText::new(crate::tl!("Chat can read and edit the loaded document. Use Undo to reverse edits.")).small().color(t.text_dim));
@@ -875,3 +980,14 @@ fn panel(app: &mut WordApp, ui: &mut Ui) {
 
 #[cfg(test)]
 mod tests;
+
+/// Acquire protected ChatGPT OAuth JSON using WordCraft's native login helper.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn run_login_helper(args: &[String]) -> Result<(), String> {
+    auth::login::run(args)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn run_login_helper(_args: &[String]) -> Result<(), String> {
+    Err("ChatGPT login requires the native desktop helper".into())
+}

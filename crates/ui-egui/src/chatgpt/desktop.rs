@@ -128,6 +128,21 @@ impl Worker {
                 self.choose_model(&mut account);
                 Ok(account)
             }
+            "account/login/start" => {
+                let new_account = p.get("newAccount").and_then(Value::as_bool).unwrap_or(false);
+                if !new_account
+                    && let Ok(mut account) = auth::account(&http)
+                    && !account["account"].is_null()
+                {
+                    self.choose_model(&mut account);
+                    return Ok(account);
+                }
+                let mut account = auth::login::connect(&http, p.get("newAccount").and_then(Value::as_bool).unwrap_or(false), &self.stopped, |url| {
+                    self.notice("account/login/url", json!({"url": url.as_str()}))
+                })?;
+                self.choose_model(&mut account);
+                Ok(account)
+            }
             "account/logout" => auth::logout(&http),
             "thread/start" => {
                 self.history.clear();

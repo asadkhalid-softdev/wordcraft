@@ -17,3 +17,4 @@ auth.json
 **/chatgpt-direct/
 chatgpt-account*.json
 wordcraft-account*.json
+**/chatgpt-login/

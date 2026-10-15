@@ -2664,12 +2664,6 @@ preview	Title	Пример
 # ChatGPT credential settings; technical helper instructions retain English pending review.
 	ChatGPT settings	Настройки ChatGPT
 	Import authentication JSON	Импорт JSON аутентификации
-	Use the ChatGPT Assist login helper on the computer running your browser. Requires uv.	Use the ChatGPT Assist login helper on the computer running your browser. Requires uv.
-	Download the login helper repository	Скачать репозиторий помощника входа
-	Clone or download the entire repository. In its folder, run this in native PowerShell:	Clone or download the entire repository. In its folder, run this in native PowerShell:
-	Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal.	Complete sign-in and consent in the browser. Wait for Sign-in verified in the terminal.
-	Open the generated file:	Open the generated file:
-	Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant.	Copy the complete JSON and paste it below. Use a separate registration for WordCraft; do not reuse an account file already refreshing in Home Assistant.
 	Protected credential file JSON	JSON защищённого файла учётных данных
 	Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart.	Credentials stay in your private WordCraft profile, outside documents and preferences. Login persists after restart.
 	Import and connect	Импортировать и подключиться
@@ -2678,5 +2672,17 @@ preview	Title	Пример
 	ChatGPT model	Модель ChatGPT
 	Available models appear after importing credentials or connecting.	Available models appear after importing credentials or connecting.
 	ChatGPT Settings → Usage	ChatGPT Settings → Usage
-	uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"	uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"
-	notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"	notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"
+
+# Standalone WordCraft sign-in; helper instructions retain English pending review.
+	Continue with ChatGPT	Продолжить с ChatGPT
+	Connect your ChatGPT account to WordCraft.	Connect your ChatGPT account to WordCraft.
+	Use a different account	Использовать другую учётную запись
+	Advanced: import authentication JSON	Дополнительно: импорт JSON аутентификации
+	Optional: use WordCraft’s bundled Rust helper to create a protected JSON file.	Optional: use WordCraft’s bundled Rust helper to create a protected JSON file.
+	Run this from the WordCraft repository in native PowerShell:	Run this from the WordCraft repository in native PowerShell:
+	cargo run -p wordcraft-ui-egui --bin wordcraft-chatgpt-login	cargo run -p wordcraft-ui-egui --bin wordcraft-chatgpt-login
+	Complete browser sign-in, wait for Sign-in verified, then open the generated file:	Complete browser sign-in, wait for Sign-in verified, then open the generated file:
+	notepad "$env:APPDATA\\WordCraft\\chatgpt-login\\wordcraft-account.json"	notepad "$env:APPDATA\\WordCraft\\chatgpt-login\\wordcraft-account.json"
+
+	Sign in in your browser. WordCraft saves the credentials and connects automatically. Login persists after restart.	Sign in in your browser. WordCraft saves the credentials and connects automatically. Login persists after restart.
+	Keep credential JSON private. Never share it or commit it to Git. Clear your clipboard after importing.	Keep credential JSON private. Never share it or commit it to Git. Clear your clipboard after importing.

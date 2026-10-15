@@ -6,7 +6,7 @@ use rsa::{
     rand_core::OsRng,
 };
 
-fn example() -> Credentials {
+pub(super) fn example() -> Credentials {
     Credentials {
         client_id: "test-registration".into(),
         subject: "test-subject".into(),

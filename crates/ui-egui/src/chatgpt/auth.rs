@@ -212,7 +212,7 @@ fn load(path: &Path) -> Result<Option<Credentials>, String> {
     result.map(Some)
 }
 
-fn save(path: &Path, credentials: &Credentials) -> Result<(), String> {
+fn save(path: &Path, credentials: &impl Serialize) -> Result<(), String> {
     let parent = path.parent().ok_or("Invalid credential path")?;
     let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|_| "Could not create private credential storage")?;
     protect(temp.path())?;
@@ -281,19 +281,27 @@ pub(super) fn models(http: &Client, token: &str) -> Result<Vec<Value>, String> {
 }
 
 pub(super) fn import(http: &Client, raw: &str) -> Result<Value, String> {
+    install(http, Credentials::parse(raw)?, &std::sync::atomic::AtomicBool::new(false), false)
+}
+
+fn install(http: &Client, mut credentials: Credentials, cancelled: &std::sync::atomic::AtomicBool, fresh: bool) -> Result<Value, String> {
     let (path, _lock) = locked()?;
-    let mut credentials = Credentials::parse(raw)?;
     credentials.verify(http)?;
     credentials.earliest_refresh_at = 0.0;
-    if load(&path)?.is_some_and(|saved| {
-        saved.client_id == credentials.client_id
-            && saved.subject == credentials.subject
-            && saved.expires_at >= credentials.expires_at
-            && saved.access_token != credentials.access_token
-    }) {
+    if !fresh
+        && load(&path)?.is_some_and(|saved| {
+            saved.client_id == credentials.client_id
+                && saved.subject == credentials.subject
+                && saved.expires_at >= credentials.expires_at
+                && saved.access_token != credentials.access_token
+        })
+    {
         return Err("This registration has newer saved credentials. Create a fresh helper output file instead of importing an old token set.".into());
     }
     let models = models(http, &credentials.access_token)?;
+    if cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err("Sign-in cancelled".into());
+    }
     save(&path, &credentials)?;
     // The imported email/host/expiry are untrusted. Show an issued registration suffix instead.
     let label = format!("ChatGPT account · {}", credentials.client_id.chars().rev().take(8).collect::<String>().chars().rev().collect::<String>());
@@ -358,3 +366,6 @@ pub(super) fn logout(http: &Client) -> Result<Value, String> {
 
 #[cfg(test)]
 mod tests;
+
+// Native helper shares verification and protected storage with the document assistant.
+pub(super) mod login;

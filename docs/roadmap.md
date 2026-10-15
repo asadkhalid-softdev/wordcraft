@@ -1,6 +1,6 @@
 # WordCraft roadmap: milestones and what's next
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously minor (Czech proofing review fixes; previously minor: Portuguese proofing; previously minor: Polish interface and Polish proofing; previously trivial: M7: formatting revisions landed, #41; previously trivial: M5: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: alpha gate checked: six core workflows pass; previously major: milestones moved here from ROADMAP.md; Current focus set from the re-measured gaps) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (standalone ChatGPT sign-in and first-party documentation); previously minor (ChatGPT OAuth JSON settings and direct transport); previously minor (ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands); previously minor (Czech proofing review fixes; previously minor: Portuguese proofing; previously minor: Polish interface and Polish proofing; previously trivial: M7: formatting revisions landed, #41; previously trivial: M5: Draw Table and Eraser landed, #303; previously minor: beta distance restated: ~15 points, ~150–230 h; previously: alpha gate checked: six core workflows pass; previously major: milestones moved here from ROADMAP.md; Current focus set from the re-measured gaps) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 Forward-looking plan. The summary is [`ROADMAP.md`](../ROADMAP.md); the ranked work list is
 [`gaps.md`](gaps.md); the numbers are in [`target-app-parity.md`](target-app-parity.md). Hours are
@@ -65,7 +65,7 @@ partial rows are fidelity gaps (beta work), not broken workflows. WordCraft stay
 | M15 | Localization (12 key languages, RTL interface, proofing languages) | 15 UI languages; English, Polish and Portuguese proofing plus Czech spelling and generic checks (system Hunspell; English hyphenation fallback), a proofing language per run | 70–115 h |
 | M16 | Right-to-left and East Asian typography | RTL paragraphs done (#207) | 30–45 h |
 
-**M0 extension:** desktop ChatGPT document assistant: collapsible right pane, reference-compatible OAuth JSON settings, account-model selection, streamed single chat, clear/stop controls, and full engine command discovery/execution. See [chatgpt.md](chatgpt.md) for setup and validation limits. Beta priorities and readiness estimates are unchanged.
+**M0 extension:** desktop ChatGPT document assistant: collapsible right pane, standalone browser sign-in and advanced OAuth JSON settings, account-model selection, streamed single chat, clear/stop controls, and full engine command discovery/execution. See [chatgpt.md](chatgpt.md) for setup and validation limits. Beta priorities and readiness estimates are unchanged.
 
 ## Next after beta
 
@@ -76,7 +76,8 @@ languages, screen-reader access, ecosystem decisions (VBA, add-ins, cloud), an i
 
 | Date | Change | Summary |
 |---|---|---|
-| 2026-10-15 | minor | Reference-compatible ChatGPT OAuth JSON settings, protected refresh and direct inference |
+| 2026-10-15 | minor | WordCraft-owned browser login, automatic credential storage and standalone documentation |
+| 2026-10-15 | minor | Standalone ChatGPT browser sign-in, automatic credential import and bundled Rust helper |
 | 2026-10-15 | minor | ChatGPT sidebar: browser sign-in, one clearable conversation and document editing through engine commands |
 | 2026-10-12 | minor | Czech proofing review: short-word splits rank after deletion, NOSUGGEST excludes suggestions while accepting typed forms, affix comments apply only to headers, ratios keep spaces and repeated-word messages use Czech quotes; synthetic engine end-to-end and latency checks |
 | 2026-10-12 | minor | Czech spelling from the installed Hunspell dictionary, runtime-table suggestions and generic checks; Czech interface writes cs-CZ documents; no Czech hyphenation patterns bundled; estimates unchanged |

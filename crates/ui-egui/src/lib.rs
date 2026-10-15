@@ -2390,6 +2390,7 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.chatgpt.toggle"
             | "ui.chatgpt.connect"
             | "ui.chatgpt.login"
+            | "ui.chatgpt.cancelLogin"
             | "ui.chatgpt.settings"
             | "ui.chatgpt.import"
             | "ui.chatgpt.logout"

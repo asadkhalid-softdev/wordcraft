@@ -1,79 +1,104 @@
 # ChatGPT document assistant
 
-Last updated: 2026-10-15 · M0 extension: imported OSS OAuth authentication.
+Last updated: 2026-10-15 · M0 extension: standalone browser sign-in and automatic credential import.
 
-Open **ChatGPT** in the title bar, then **⋯ → ChatGPT settings**. Paste the complete protected
-credential JSON from the ChatGPT Assist login helper into **Protected credential file JSON** and
-click **Import and connect**. Choose an account model in the same settings popup.
+## Sign in from WordCraft
 
-WordCraft connects directly to OpenAI with the imported ChatGPT grant. The native Codex CLI and an
-API key are no longer required. Access depends on your account/workspace's eligible ChatGPT plan
-permissions and usage limits. This imports an OSS OAuth grant, not a ChatGPT browser session or
-Codex `auth.json`.
+Open **ChatGPT** in the title bar and click **Continue with ChatGPT**. Your browser opens OpenAI’s
+sign-in page. Sign in, select your workspace if prompted, and approve **WordCraft** to use your
+ChatGPT plan. The browser returns to a temporary `http://127.0.0.1:<port>/auth/callback` listener
+on this computer. Return to WordCraft while it finishes verification and model discovery.
 
-## Acquire the JSON on native Windows
+WordCraft creates the authentication JSON, saves it privately and connects automatically.
+There is no file to copy for normal setup. The sidebar offers **Cancel sign-in** and a link to
+reopen the browser page if needed. The browser callback has a five-minute timeout. On later
+launches, **Continue with ChatGPT** uses the existing saved grant when it is valid.
 
-These instructions follow the reference [ChatGPT Assist installation guide](https://github.com/asadkhalid-softdev/hass-chatgpt-integration/blob/main/docs/INSTALLATION.md).
-Its login helper performs OAuth, validates the returned identity and creates the protected JSON.
-Use the full helper repository, including `scripts/` and `custom_components/`; the helper shares
-its OAuth code with the integration. Home Assistant itself is not required.
+Choose a model under **⋯ → ChatGPT settings**. To register another account/workspace, use
+**Use a different account** there. New registrations use WordCraft’s own app name and stable
+host ID. Previously imported registrations are not silently repurposed for native sign-in.
 
-1. Install `uv` on the computer running your browser, then clone or download
-   [hass-chatgpt-integration](https://github.com/asadkhalid-softdev/hass-chatgpt-integration).
-2. Open native PowerShell in that repository's directory. Run this single line:
+Only WordCraft and your browser are needed. No API key, Codex CLI, Python environment or other
+integration repository is required. Access remains subject to your account/workspace’s eligible
+ChatGPT plan permissions and usage limits. OAuth sign-in cannot bypass an account restriction.
 
-   ```powershell
-   uv run --python 3.12 --script scripts/chatgpt_login.py --output "$HOME/.config/chatgpt-assist/wordcraft-account.json"
-   ```
+## Optional standalone JSON helper
 
-   `uv` downloads Python and manages the helper's dependencies. Use a local NTFS user profile
-   folder on Windows so the helper can protect the output file.
-3. Complete OpenAI sign-in, choose your workspace if prompted, and grant ChatGPT plan access.
-   Wait for **Sign-in verified** in the terminal. The browser callback must reach
-   `http://127.0.0.1:<port>/auth/callback` on the same computer. The helper times out after five minutes.
-4. Open the generated file:
+The repository includes its own Rust executable, `wordcraft-chatgpt-login`. It uses the same
+OAuth validation and protected storage implementation as the sidebar. Use it only if you prefer
+an explicit file transfer or are troubleshooting browser sign-in in the app.
 
-   ```powershell
-   notepad "$HOME/.config/chatgpt-assist/wordcraft-account.json"
-   ```
+From the WordCraft repository in native Windows PowerShell:
 
-5. Copy its entire JSON into WordCraft's masked settings field and click **Import and connect**.
-   The access token must still be valid. If validation says it expired, run the helper again.
-6. Clear your clipboard and close the editor. Keep any retained file private; never put it in Git
-   or a support message. WordCraft clears the input after submission or closing settings.
+```powershell
+cargo run -p wordcraft-ui-egui --bin wordcraft-chatgpt-login
+```
 
-If the browser does not open, add `--no-browser` to the helper command, then open the printed URL
-in a browser on the same computer. The original helper guide also covers virtual environments
-and Linux/macOS setup.
+Complete browser sign-in and wait for **Sign-in verified**. On Windows, open its generated JSON:
 
-**Create a separate registration for WordCraft.** The distinct `wordcraft-account.json` output
-avoids reusing Home Assistant's default file. If that output already belongs to another running
-integration, choose a new output filename. Do not import one renewable session into multiple
-applications: rotating refresh tokens would race. The shared helper currently labels the OAuth
-registration **ChatGPT Assist** on OpenAI's consent screen. After import, WordCraft owns refreshes.
-Reauthorizing an already-imported registration must use its latest rotated credentials, not a stale
-helper output; use a new output filename to create a fresh registration when necessary.
+```powershell
+notepad "$env:APPDATA\WordCraft\chatgpt-login\wordcraft-account.json"
+```
 
-## Settings and persistence
+Open **ChatGPT → ⋯ → ChatGPT settings → Advanced: import authentication JSON**. Paste the complete
+file into **Protected credential file JSON**, then click **Import and connect**. WordCraft verifies
+the signed access token and discovers account models before replacing the managed credentials.
+Clear your clipboard and close the editor. The JSON input is cleared after submission or closing
+settings. Do not share a renewable session with another application; refresh tokens rotate.
 
-- Login persists across application restarts. Click **Connect to ChatGPT** to reuse the saved grant.
-- Credentials are stored separately from preferences and documents at
-  `%APPDATA%\WordCraft\chatgpt-direct\account.json` on Windows,
-  `~/Library/Application Support/WordCraft/chatgpt-direct/account.json` on macOS, or
-  `$XDG_CONFIG_HOME/wordcraft/chatgpt-direct/account.json` (default `~/.config/wordcraft/…`) elsewhere.
-  `WORDCRAFT_PROFILE_DIR` overrides the WordCraft profile directory.
-- Writes are atomic. Credential files have a protected current-user Windows ACL or Unix mode 0600.
-  This is protected local plaintext storage, not an encrypted vault.
-- Import verifies the access-token signature against OpenAI signing keys, RS256, issuer, audience,
-  expiry, issue time, subject, issued client ID and required ChatGPT plan scopes. Imported email,
-  host attribution and expiry metadata are not trusted.
-- WordCraft discovers the signed-in account's model list. Your chosen model is a nonsecret preference.
-- Refreshes use the issued client ID and are serialized with a cross-process file lock. Replacement
-  refresh tokens are saved atomically. Do not share the session with another app.
-- **Sign out** attempts remote revocation and removes local credentials. If revocation cannot be
-  confirmed, WordCraft says so; disconnect the registration in ChatGPT Settings.
-- Credentials and transcripts are excluded from UI preferences, control status and diagnostics.
-  Provider error bodies are not shown or logged. Local credential filenames are ignored by Git.
+Helper options follow the Cargo argument separator:
+
+```powershell
+cargo run -p wordcraft-ui-egui --bin wordcraft-chatgpt-login -- --help
+cargo run -p wordcraft-ui-egui --bin wordcraft-chatgpt-login -- --no-browser
+cargo run -p wordcraft-ui-egui --bin wordcraft-chatgpt-login -- --new-account
+```
+
+`--no-browser` prints a sign-in URL for opening manually on the same computer. It contains no ID,
+access or refresh token. Returning login preserves the issued client ID and checks the returned
+identity. `--new-account` creates a fresh registration. The helper writes a separate export and
+never prints its credential contents. Recreate an expired export with the helper instead of
+editing token fields by hand.
+
+On macOS and Linux/BSD, use the same Cargo command. The helper prints the output location under
+WordCraft’s settings directory. A separately built helper executable accepts the same flags directly.
+
+## Storage and validation
+
+WordCraft’s settings folder is `%APPDATA%\WordCraft` on Windows,
+`~/Library/Application Support/WordCraft` on macOS, and `$XDG_CONFIG_HOME/wordcraft` or
+`~/.config/wordcraft` on Linux/BSD. `WORDCRAFT_PROFILE_DIR` overrides this root.
+
+- Automatic sign-in and imported credentials use `chatgpt-direct/account.json`.
+- The advanced helper’s export is `chatgpt-login/wordcraft-account.json`.
+- `chatgpt-login/host.json` persists an opaque host ID; `registration.json` remembers the
+  WordCraft registration’s issued client ID and subject. Lock files serialize sign-in and refresh.
+- Credential writes are atomic and protected with current-user Windows ACLs or Unix mode 0600.
+  Files are protected local plaintext, not an encrypted vault. Keep the profile and backups private.
+- Each browser attempt has fresh state, OIDC nonce and PKCE verifier. Callback host, path, method,
+  duplicate parameters, state, issued client ID and account identity are checked.
+- ID-token and access-token signatures use OpenAI’s signing keys. Verification checks RS256,
+  issuer, audience, expiry, issue time and subject; ID tokens must match the attempt’s nonce,
+  and access tokens must authorize the issued client and required ChatGPT plan scopes.
+- Imported account/expiry/host metadata is not trusted to establish identity or permissions.
+- Rotating refreshes use the saved issued client ID and a cross-process lock. The latest replacement
+  tokens are persisted atomically. The selected model is a nonsecret UI preference.
+- **Sign out** attempts remote revocation and removes local credentials. If remote revocation
+  cannot be confirmed, WordCraft says so; disconnect the registration in ChatGPT Settings.
+- Credentials and transcripts are excluded from normal UI preferences and control status.
+  Authentication error messages never echo submitted JSON or provider error bodies.
+
+## Troubleshooting
+
+If no browser opens, click **Open sign-in page** in the sidebar. The browser and WordCraft must
+run on the same computer with functioning loopback networking; use native Windows PowerShell
+for the optional helper when WordCraft runs natively on Windows. Check local firewall rules if
+the callback cannot reach the app. Cancel and retry after a timeout or denied consent.
+
+If token verification fails, check your system clock and sign in again. If OpenAI denies model
+access or reports a usage limit, review account/workspace policy and
+[ChatGPT Settings → Usage](https://chatgpt.com/settings/usage). A successful browser login does
+not itself guarantee that the account has eligible inference access.
 
 ## Conversation and document access
 
@@ -98,14 +123,15 @@ Tools execute only after `response.completed`; partial, failed or interrupted st
 provisional actions. Input, stream size, output item count and action rounds are bounded. Mutating
 requests are not automatically retried.
 
-Official protocol references: [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference),
+Official protocol references: [registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in),
+[models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference),
 [accounts, refresh and revocation](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions).
 The browser-hosted WASM app displays an availability message; credential storage and HTTPS transport
 are compiled only for native desktop.
 
 ## Validation
 
-Offline tests cover signed access-token validation, private atomic credential replacement, malformed
+Offline tests cover PKCE, loopback callback validation, nonce and signed ID-token checks, cancellation, signed access-token validation, private atomic credential replacement, malformed
 imports, bounded SSE parsing, completed-response gating, document command discovery/editing/Undo,
 stale and stopped tool calls, and settings/credential isolation. Headless screenshots inspect the
 sidebar and settings popup. Live sign-in, account model discovery and a real inference turn still
@@ -115,5 +141,6 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
-| 2026-10-15 | Replace Codex login with reference-compatible OAuth JSON import, protected persistence, direct streaming inference and settings/model picker |
+| 2026-10-15 | Standalone WordCraft browser sign-in, automatic credential import, bundled Rust JSON helper and first-party setup guide |
+| 2026-10-15 | OAuth JSON import, protected persistence, direct streaming inference and settings/model picker |
 | 2026-10-15 | Initial document sidebar and command tools |
