@@ -6,8 +6,20 @@ use pulldown_cmark::{Event, Options, Parser, Tag};
 
 use crate::{WordApp, theme::Tokens};
 
-pub(super) fn show(app: &mut WordApp, ui: &mut egui::Ui, cache: &mut CommonMarkCache, text: &str) {
+pub(super) fn show(app: &mut WordApp, ui: &mut egui::Ui, cache: &mut CommonMarkCache, text: &str) -> Option<String> {
     let safe = safe_markdown(&normalize_math(&super::citations::strip_markers(text)));
+    // Hook every syntactically valid local URL, including unknown IDs, so none can
+    // escape to a browser or OS URL handler. Navigation happens after transcript restoration.
+    let links: Vec<String> = Parser::new_ext(&safe, Options::all())
+        .filter_map(|event| match event {
+            Event::Start(Tag::Link { dest_url, .. }) if super::links::token(&dest_url).is_some() => Some(dest_url.into_string()),
+            _ => None,
+        })
+        .collect();
+    cache.link_hooks_clear();
+    for url in &links {
+        cache.add_link_hook(url.clone());
+    }
     let mut equations = BTreeMap::new();
     for event in Parser::new_ext(&safe, Options::ENABLE_MATH) {
         let (source, inline) = match event {
@@ -50,14 +62,17 @@ pub(super) fn show(app: &mut WordApp, ui: &mut egui::Ui, cache: &mut CommonMarkC
         }
     };
     CommonMarkViewer::new().explicit_image_uri_scheme(true).render_math_fn(Some(&math)).show(ui, cache, &safe);
+    let clicked = links.into_iter().find(|url| cache.get_link_hook(url) == Some(true));
+    cache.link_hooks_clear();
+    clicked
 }
 
-/// ChatGPT commonly uses LaTeX delimiters; leave code spans and fenced examples untouched.
+/// ChatGPT commonly uses LaTeX delimiters; leave code and Markdown link syntax untouched.
 pub(super) fn normalize_math(text: &str) -> String {
     let mut result = String::new();
     let mut copied = 0usize;
     for (event, range) in Parser::new(text).into_offset_iter() {
-        if !matches!(event, Event::Code(_) | Event::Start(Tag::CodeBlock(_))) || range.start < copied {
+        if !matches!(event, Event::Code(_) | Event::Start(Tag::CodeBlock(_) | Tag::Link { .. })) || range.start < copied {
             continue;
         }
         if let Some(prefix) = text.get(copied..range.start) {
@@ -97,7 +112,7 @@ fn math_delimiters(text: &str) -> String {
     result
 }
 
-/// Remove images and non-web hyperlinks before the viewer can ask egui to load or open them.
+/// Remove images and unsupported hyperlinks before the viewer can ask egui to load or open them.
 pub(super) fn safe_markdown(text: &str) -> String {
     let mut parser = Parser::new_ext(text, Options::all()).into_offset_iter();
     let mut out = String::new();
@@ -144,5 +159,6 @@ pub(super) fn safe_markdown(text: &str) -> String {
 
 fn safe_link(url: &str) -> bool {
     let lower = url.to_ascii_lowercase();
-    ["https://", "http://", "mailto:"].iter().any(|prefix| lower.starts_with(prefix)) && !url.chars().any(char::is_control)
+    (["https://", "http://", "mailto:"].iter().any(|prefix| lower.starts_with(prefix)) || super::links::token(url).is_some())
+        && !url.chars().any(char::is_control)
 }

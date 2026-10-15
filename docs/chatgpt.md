@@ -1,6 +1,6 @@
 # ChatGPT document assistant
 
-Last updated: 2026-10-15 · M0 feature: private per-document chat history and resumption.
+Last updated: 2026-10-16 · M0 feature: clickable document citations in assistant replies.
 
 ## Sign in from WordCraft
 
@@ -120,6 +120,29 @@ ambiguous or excessively large searches ask you to select it again instead of gu
 A missing or changed reference also prevents sending that draft until it is removed or replaced.
 Rectangular column selections and whole-cell selections require a continuous text selection.
 
+## Click document citations in replies
+
+ChatGPT can include links such as **Introduction** or **Source passage** directly in a reply,
+including lists and Markdown tables. Click one to scroll to and highlight that passage in the
+loaded document. These are local navigation links; they never open a browser or edit the text.
+They are separate from your selected-text attachments and do not fill the composer.
+
+The assistant is instructed to read/search first, then call `wordcraft_reference` with the live
+`documentId`, `revision`, exact `{anchor, focus}` selection, exact quoted `text` and a short `label`.
+Each position uses `{story, path, off}` as returned by the document tools; offsets are UTF-8 bytes.
+WordCraft verifies the quote and range, and returns `markdown` and `url`. The assistant copies the
+returned Markdown verbatim, for example `[Introduction](wordcraft://document/<opaque-id>)`.
+It must never invent an ID or a destination from paragraph numbers alone. Creating a citation
+leaves your selection, document contents and Undo history unchanged.
+
+Citations are scoped to the current document and conversation and saved with chat history.
+Reopening revalidates their text rather than trusting old session revisions. After edits, WordCraft
+tries the same conservative excerpt relocation used for selected-text references. Changed or
+ambiguous passages, searches beyond the relocation limit, and unknown IDs show an error instead
+of choosing a guessed location. Ask ChatGPT to reread and create a fresh link if needed.
+Clearing the conversation removes its destinations. A conversation supports up to 512 citations,
+with each cited range limited to 32,000 bytes; existing older history files remain readable.
+
 ## Formatted replies
 
 Assistant messages use a native CommonMark/GitHub Markdown preview: headings, emphasis, lists,
@@ -205,7 +228,7 @@ remain and can be reversed with normal Undo. Ctrl+Enter (Cmd+Enter on macOS) sen
 ordinary Enter adds a newline.
 
 The assistant uses `wordcraft_read_file` for explicitly referenced files, `wordcraft_commands` to discover every registered engine command and native
-printing command, `wordcraft_document` for bounded overview/search/read operations, `wordcraft_inspect` for a bounded overview, and `wordcraft_execute`
+printing command, `wordcraft_document` for bounded overview/search/read operations, `wordcraft_reference` for verified clickable citations, `wordcraft_inspect` for a bounded overview, and `wordcraft_execute`
 to dispatch edits through WordCraft's normal command validation and Undo. Unsupported UI dialogs,
 shell execution and arbitrary external tools are excluded. Tool calls must still belong to the
 active document and turn, and cannot silently discard unsaved work.
@@ -272,6 +295,7 @@ require an interactive account check. No real credential JSON is used in tests o
 
 | Date | Change |
 |---|---|
+| 2026-10-16 | Verified document-citation tool, local Markdown link navigation and persisted destinations |
 | 2026-10-15 | Private per-document chat archives, restored drafts/references and bounded continuation context |
 | 2026-10-15 | Keep ChatGPT outside Focus-mode pane suppression and contain wide streamed Markdown inside the history viewport |
 | 2026-10-15 | Bounded overview, literal search and paged document reads; automatic working-memory checkpoints and context-limit recovery |

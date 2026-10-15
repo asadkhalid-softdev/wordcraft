@@ -23,6 +23,8 @@ pub(super) struct Archive {
     pub messages: Vec<Message>,
     pub draft: String,
     pub references: Vec<Reference>,
+    #[serde(default)]
+    pub links: Vec<super::links::DocumentLink>,
     pub next_reference: u64,
     pub memory: Vec<Value>,
 }
@@ -33,6 +35,7 @@ impl Archive {
             messages: state.messages.clone(),
             draft: state.draft.clone(),
             references: state.references.clone(),
+            links: state.links.clone(),
             next_reference: state.next_reference,
             memory: state.memory.clone(),
         }
@@ -42,6 +45,8 @@ impl Archive {
             || self.messages.len() > MAX_MESSAGES
             || self.draft.len() > super::MAX_PROMPT
             || self.references.len() > super::references::MAX_REFERENCES
+            || self.links.len() > super::links::MAX_LINKS
+            || self.links.iter().any(|link| !link.valid())
             || !valid_memory(&self.memory)
         {
             return Err("Saved chat has an unsupported format or exceeds its limits".into());
@@ -55,7 +60,9 @@ impl Archive {
                 return Err("Saved chat contains an invalid message".into());
             }
         }
-        for r in self.references.iter().chain(self.messages.iter().flat_map(|m| m.references.iter())) {
+        for r in
+            self.references.iter().chain(self.messages.iter().flat_map(|m| m.references.iter())).chain(self.links.iter().map(|link| &link.reference))
+        {
             r.validate_saved()?;
             if r.id > self.next_reference {
                 return Err("Saved chat reference identity is invalid".into());
@@ -64,7 +71,7 @@ impl Archive {
         Ok(())
     }
     pub fn is_empty(&self) -> bool {
-        self.messages.is_empty() && self.draft.is_empty() && self.references.is_empty() && self.memory.is_empty()
+        self.messages.is_empty() && self.draft.is_empty() && self.references.is_empty() && self.links.is_empty() && self.memory.is_empty()
     }
 }
 
@@ -383,6 +390,10 @@ fn sync(app: &mut crate::WordApp, ctx: &egui::Context) -> Result<(), String> {
                         app.chatgpt.messages = archive.messages;
                         app.chatgpt.draft = archive.draft;
                         app.chatgpt.references = archive.references;
+                        app.chatgpt.links = archive.links;
+                        for link in &mut app.chatgpt.links {
+                            link.reference.restore_document(document);
+                        }
                         app.chatgpt.next_reference = archive.next_reference;
                         app.chatgpt.memory = archive.memory;
                         app.chatgpt.visible_messages = 256;
@@ -605,7 +616,7 @@ mod tests {
         assert_eq!(restored.draft, saved.draft);
         assert_eq!(restored.memory, saved.memory);
         let value: Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(value.as_object().unwrap().len(), 6);
+        assert_eq!(value.as_object().unwrap().len(), 7);
         assert!(value.get("account").is_none());
         assert!(value.get("auth_json").is_none());
         let mut invalid = saved;
@@ -645,6 +656,9 @@ mod tests {
         let reference = Reference::capture(&original.session, 1).unwrap();
         original.chatgpt.references.push(reference);
         original.chatgpt.next_reference = 1;
+        let citation_args = json!({"documentId":original.session.document_id(),"revision":original.session.rev(),
+            "selection":original.session.sel,"text":"Hello","label":"Opening passage"});
+        let citation = super::super::links::create(&mut original, &citation_args).unwrap();
         for i in 0..320 {
             original.chatgpt.push("You", format!("Message {i}"), None);
         }
@@ -661,6 +675,8 @@ mod tests {
         assert!(restored.chatgpt.messages.first().unwrap().item.is_none());
         assert_eq!(restored.chatgpt.draft, "Unsent draft");
         assert_eq!(restored.chatgpt.references[0].resolve(&restored.session).unwrap().focus.off, 5);
+        super::super::links::navigate(&mut restored, citation["url"].as_str().unwrap()).unwrap();
+        assert_eq!(restored.session.selected_text(), "Hello");
         let (client, outgoing) = super::super::desktop::Client::test_pair();
         restored.chatgpt.client = Some(client);
         restored.chatgpt.ready = true;

@@ -24,7 +24,14 @@ impl Reference {
         if session.sel.is_collapsed() || session.cell_range().is_some() || session.column_segments().is_some() {
             return Err("Select a continuous range of text to reference".into());
         }
-        let (a, b) = session.sel.ordered();
+        Self::capture_range(session, session.sel.clone(), id)
+    }
+
+    pub fn capture_range(session: &Session, selection: Selection, id: u64) -> Result<Self, String> {
+        if selection.is_collapsed() || selection.anchor.path.0.len() > 100 || selection.focus.path.0.len() > 100 {
+            return Err("Reference needs a nonempty, bounded text range".into());
+        }
+        let (a, b) = selection.ordered();
         let text = range_text(&session.doc, &a, &b)?;
         if text.trim().is_empty() {
             return Err("Select some text to reference".into());
@@ -33,7 +40,7 @@ impl Reference {
         let last = session.doc.para_at(&b).ok_or("Selection is no longer available")?.text.as_str();
         let before = first.get(..a.off).ok_or("Invalid selection boundary")?.chars().rev().take(24).collect::<Vec<_>>().into_iter().rev().collect();
         let after = last.get(b.off..).ok_or("Invalid selection boundary")?.chars().take(24).collect();
-        Ok(Self { id, document: session.document_id(), selection: session.sel.clone(), text, revision: session.rev(), before, after })
+        Ok(Self { id, document: session.document_id(), selection, text, revision: session.rev(), before, after })
     }
 
     pub(super) fn validate_saved(&self) -> Result<(), String> {

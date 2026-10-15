@@ -2400,6 +2400,8 @@ pub(crate) fn works_without_document(id: &str) -> bool {
             | "ui.chatgpt.cancelLogin"
             | "ui.chatgpt.attachSelection"
             | "ui.chatgpt.removeReference"
+            | "ui.chatgpt.createReference"
+            | "ui.chatgpt.showLink"
             | "ui.chatgpt.showReference"
             | "ui.chatgpt.webSearch"
             | "ui.chatgpt.settings"

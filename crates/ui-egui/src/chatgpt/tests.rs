@@ -207,7 +207,7 @@ fn protocol_round_trip_from_account_to_edit_and_clear() {
     let start = outgoing.try_recv().unwrap();
     assert_eq!(start["method"], "thread/start");
     assert_eq!(start["params"]["ephemeral"], true);
-    assert_eq!(start["params"]["dynamicTools"].as_array().unwrap().len(), 5);
+    assert_eq!(start["params"]["dynamicTools"].as_array().unwrap().len(), 6);
     receive(&mut app, &ctx, json!({"id": start["id"], "result": {"thread": {"id": "thread"}}})).unwrap();
     let turn = outgoing.try_recv().unwrap();
     assert_eq!(turn["method"], "turn/start");
@@ -691,10 +691,15 @@ fn sidebar_streaming_layout_preview() {
     app.chatgpt.account = Some("Preview account".into());
     app.chatgpt.busy = true;
     app.chatgpt.activity = "Reading document…".into();
+    let citation_args = json!({"documentId":app.session.document_id(),"revision":app.session.rev(),
+        "selection":{"anchor":{"story":"body","path":[0],"off":0},"focus":{"story":"body","path":[0],"off":5}},
+        "text":"Hello","label":"Open cited passage"});
+    let citation = links::create(&mut app, &citation_args).unwrap();
     app.chatgpt.push(
         "ChatGPT",
         format!(
-            "## Document answer\n\nA wide table stays inside the chat history.\n\n| {} |\n| {} |\n| {} |",
+            "## Document answer\n\nA wide table stays inside the chat history.\n\n{}\n\n| {} |\n| {} |\n| {} |",
+            citation["markdown"].as_str().unwrap(),
             vec!["Column"; 24].join(" | "),
             vec!["---"; 24].join(" | "),
             vec!["Document context"; 24].join(" | ")
@@ -715,4 +720,64 @@ fn sidebar_streaming_layout_preview() {
     harness.state_mut().session.run("view.focus", &json!({"value":true})).unwrap();
     harness.run_steps(4);
     harness.render().unwrap().save(root.join("chatgpt-sidebar-focus-reply.png")).unwrap();
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn assistant_can_create_verified_document_links_through_its_tool_protocol() {
+    let mut app = app();
+    let ctx = egui::Context::default();
+    let (client, outgoing) = desktop::Client::test_pair();
+    app.chatgpt.client = Some(client);
+    app.chatgpt.ready = true;
+    app.chatgpt.account = Some("test@example.com".into());
+    app.chatgpt.submit(&ctx, "Explain this passage with a clickable source", app.session.document_id()).unwrap();
+    let start = outgoing.try_recv().unwrap();
+    assert!(start["params"]["dynamicTools"].as_array().unwrap().iter().any(|tool| tool["name"] == "wordcraft_reference"));
+    receive(&mut app, &ctx, json!({"id":start["id"],"result":{"thread":{"id":"thread"}}})).unwrap();
+    let turn = outgoing.try_recv().unwrap();
+    receive(&mut app, &ctx, json!({"id":turn["id"],"result":{"turn":{"id":"turn"}}})).unwrap();
+    let selection = app.session.sel.clone();
+    let revision = app.session.rev();
+    let arguments = json!({"documentId":app.session.document_id(),"revision":revision,"selection":{
+        "anchor":{"story":"body","path":[0],"off":6},"focus":{"story":"body","path":[0],"off":11}},"text":"world","label":"Source passage"});
+    receive(
+        &mut app,
+        &ctx,
+        json!({"id":"cite-1","method":"item/tool/call","params":{
+        "threadId":"thread","turnId":"turn","tool":"wordcraft_reference","arguments":arguments}}),
+    )
+    .unwrap();
+    let reply = outgoing.try_recv().unwrap();
+    assert_eq!(reply["result"]["success"], true);
+    let citation: Value = serde_json::from_str(reply["result"]["contentItems"][0]["text"].as_str().unwrap()).unwrap();
+    assert!(citation["markdown"].as_str().unwrap().starts_with("[Source passage](wordcraft://document/"));
+    assert_eq!(app.session.sel, selection);
+    assert_eq!(app.session.rev(), revision);
+    receive(
+        &mut app,
+        &ctx,
+        json!({"method":"item/completed","params":{"threadId":"thread","item":{
+        "id":"answer","type":"agentMessage","text":format!("See {}.",citation["markdown"].as_str().unwrap())}}}),
+    )
+    .unwrap();
+    app.execute("ui.chatgpt.showLink", json!({"url":citation["url"]})).unwrap();
+    assert_eq!(app.session.selected_text(), "world");
+}
+
+#[test]
+fn markdown_preserves_only_strict_document_destinations_with_normal_web_links() {
+    let url = "wordcraft://document/0123456789abcdef0123456789abcdef";
+    let source = format!(
+        "| Passage | Source |\n| --- | --- |\n| Quote | [See section]({url}) |\n\n[reference][passage]\n\n[passage]: {url}\n\n[Website](https://example.com)"
+    );
+    let safe = markdown::safe_markdown(&source);
+    assert!(safe.contains(url));
+    assert!(safe.contains("https://example.com"));
+    for destination in ["wordcraft://document/1", "wordcraft://execute/text.delete", "file:///private", "javascript:alert(1)"] {
+        let source = format!("[Passage](<{destination}>)");
+        let safe = markdown::safe_markdown(&source);
+        assert!(!safe.contains(destination), "{safe}");
+        assert!(safe.contains("Passage"));
+    }
 }

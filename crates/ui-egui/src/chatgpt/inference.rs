@@ -256,7 +256,7 @@ mod search_tests {
         let functions = tools(&super::super::tool_definitions()).unwrap();
         let enabled = payload("account-model", &[], &functions, true).unwrap();
         assert_eq!(enabled["tools"][0]["type"], "namespace");
-        assert_eq!(enabled["tools"][0]["tools"].as_array().unwrap().len(), 5);
+        assert_eq!(enabled["tools"][0]["tools"].as_array().unwrap().len(), 6);
         assert_eq!(enabled["tools"][1]["type"], "web_search");
         assert_eq!(enabled["store"], false);
         assert_eq!(enabled["stream"], true);
